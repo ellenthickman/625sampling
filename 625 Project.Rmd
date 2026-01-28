@@ -22,7 +22,7 @@ options(scipen = 999)
 
 ## Download data
 ```{r}
-schoolframe <- read.csv("/Users/ellenhickman/Desktop/625/625sampling/MI_school_frame_head_counts.csv")
+schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv")
 kable(schoolframe)
 ```
 # Sampling Frame Analysis
