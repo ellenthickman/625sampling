@@ -27,17 +27,37 @@ options(scipen = 999)
 schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv")
 kable(schoolframe)
 ```
+
 # Sampling Frame Analysis
 ## 1. Noncoverage
-### Examine by: searching current # of MI schools (eg. charter)
+### Examine by: searching current # of MI schools (eg. charter). See: https://www.mischooldata.org/student-enrollment-counts-report/
 ### Prevalence:
 ### Solution: Acknowledge and accept in analysis. 
 
 ## 2. Blanks: Ellen.
-### Examine by: “print NA value”
-Missing District name ~ Non-public
+### Examine by: Missingness check. 
+``` {r}
+# a. Check missingness across variables as blank ""
+sapply(schoolframe, function(x) sum(x == "", na.rm = TRUE))
+```
+Out of 2,443 schools in Michigan, 559 do not have listed District Names. Let's examine this prevalence by Non-Public/Public schools and by Region.
+
 ### Prevalence: (eg. Frequency tables)
+```{r}
+# b. Since missing district name might vary by public/private school status, let's check:
+tab1 <- table(schoolframe$District_Name == "", schoolframe$Public.nonpublic); kable(tab1)
+# c. By region, let's check:
+tab2 <- table(schoolframe$District_Name == "", schoolframe$Region); kable(tab2)
+tab3 <- table(factor(schoolframe$District_Name == "", levels = c(TRUE, FALSE)),
+             factor(schoolframe$Region))
+kable(prop.table(tab3, margin = 2))
+# c. By district code, let's check:
+tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == ""); kable(tab4)
+```
+From Tables 1-3, we see that the majority of missing district name cases (547/559, 98%) belong to non-public (ie. private) schools, whereas only a handful of public schools are missing district names (12/1884, ~0.0%). It also looks like even though the private schools are missing District Names, they do belong to a District Code that other, public schools are also a part of. 
+
 ### Solution:
+So, the solution to the problem is to 1) ignore District Names as a cluster variable, and rely on region or district code if needed. If need be, the district name could be 2) imputed from the dcode variable for reference in communicating the results. 
 
 ## 3. Duplicates: Mi. In the whole observation. 
 ### Examine by: “print unique”
