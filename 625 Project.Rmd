@@ -17,6 +17,8 @@ library(ggplot2)
 library(dplyr)
 library(readxl)
 library(knitr)
+library(ggrepel)
+library(tidyverse)
 options(scipen = 999)
 ```
 
@@ -46,6 +48,108 @@ Missing District name ~ Non-public
 ### Examine by: 
 ### Prevalence:
 ### Solution:
+```{r}
+# Basic cleaning: ensure head-count columns are numeric (handles commas if present)
+count_vars <- c("g7_totl","g8_totl","g9_totl","g10_totl","g11_totl","g12_totl","tot_all")
+
+schoolframe <- schoolframe %>%
+  mutate(across(all_of(count_vars),
+                ~ as.numeric(gsub(",", "", as.character(.x)))))
+
+# Sanity checks
+N_rows     <- nrow(schoolframe)
+N_bcode    <- n_distinct(schoolframe$BCODE)
+N_district <- n_distinct(schoolframe$DCODE)
+
+N_rows; N_bcode; N_district
+
+# Check whether BCODE is unique (should be if each row is a unique school/building record)
+bcode_dupes <- schoolframe %>%
+  count(BCODE) %>%
+  filter(n > 1) %>%
+  arrange(desc(n))
+
+bcode_dupes
+
+# District-level school clustering
+district_summary <- schoolframe %>%
+  group_by(DCODE) %>%
+  summarise(
+    n_schools = n(),
+    district_name_count = n_distinct(na.omit(District_Name)),
+    total_enroll = sum(tot_all, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Distribution of schools per district
+summary(district_summary$n_schools)
+
+qs <- quantile(
+  district_summary$n_schools,
+  probs = c(.25, .50, .75, .90, .95, .99),
+  na.rm = TRUE
+)
+qs
+
+# Violin Plot
+q_df <- tibble(
+  prob  = names(qs),
+  value = as.numeric(qs)
+)
+
+ggplot(district_summary, aes(x = "", y = n_schools)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.18, outlier.shape = NA) +
+  geom_segment(
+    data = q_df,
+    aes(x = 0.85, xend = 1.15, y = value, yend = value),
+    inherit.aes = FALSE,
+    linewidth = 0.6
+  ) +
+  geom_text_repel(
+    data = q_df,
+    aes(x = 1.22, y = value, label = paste0(prob, ": ", round(value, 2))),
+    inherit.aes = FALSE,
+    direction = "y",
+    nudge_x = 0.08,
+    hjust = 0,
+    size = 3,
+    min.segment.length = 0
+  ) +
+  labs(
+    title = "Distribution of Number of Schools by District",
+    x = NULL,
+    y = "Schools per district"
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    plot.margin = margin(5.5, 90, 5.5, 5.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+# Largest districts by number of schools
+district_summary %>%
+  arrange(desc(n_schools)) %>%
+  slice_head(n = 10)
+
+# Potential data issue: DCODE mapping to more than one District_Name
+district_summary %>%
+  filter(district_name_count > 1) %>%
+  arrange(desc(n_schools))
+
+# Duplicates of school name within a district
+name_dupes_within_district <- schoolframe %>%
+  filter(!is.na(District_Name), !is.na(BNAME)) %>%
+  group_by(DCODE, District_Name, BNAME) %>%
+  summarise(n_records = n(), .groups = "drop") %>%
+  filter(n_records > 1) %>%
+  arrange(desc(n_records))
+
+name_dupes_within_district
+```
+
 
 ## 5. Many-to-many matching: Maze.
 ### Examine by: 
