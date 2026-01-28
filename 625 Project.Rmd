@@ -10,3 +10,29 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+## 1. Noncoverage
+### Examine by: searching current # of MI schools (eg. charter)
+### Prevalence:
+### Solution: Acknowledge and accept in analysis. 
+
+## 2. Blanks: Ellen.
+### Examine by: “print NA value”
+Missing District name ~ Non-public
+### Prevalence: (eg. Frequency tables)
+### Solution:
+
+## 3. Duplicates: Mi. In the whole observation. 
+### Examine by: “print unique”
+### Prevalence:
+### Solution:
+
+## 4. Clustering: Zupeng.
+### Examine by: 
+### Prevalence:
+### Solution:
+
+## 5. Many-to-many matching: Maze.
+### Examine by: 
+### Prevalence:
+### Solution:
