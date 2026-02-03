@@ -170,8 +170,52 @@ name_dupes_within_district <- schoolframe %>%
 name_dupes_within_district
 ```
 
+```{r}
+cv_target <- 0.05
+
+p_cig  <- 0.25  # ever smoked one cigarette
+p_mj   <- 0.18  # ever smoked marijuana
+mu_age <- 14    # age first approached
+sd_age <- 10
+
+# Element variances
+S2_cig <- p_cig * (1 - p_cig)
+S2_mj  <- p_mj  * (1 - p_mj)
+S2_age <- sd_age^2
+
+# Desired sampling variances
+varstar_cig <- (cv_target * p_cig)^2
+varstar_mj  <- (cv_target * p_mj)^2
+varstar_age <- (cv_target * mu_age)^2
+
+# Required n under SRS, ignoring FPC
+n_cig <- S2_cig / varstar_cig
+n_mj  <- S2_mj  / varstar_mj
+n_age <- S2_age / varstar_age
+
+# Round up to ensure CV <= target
+n_req <- c(
+  cig = ceiling(n_cig),
+  mj  = ceiling(n_mj),
+  age = ceiling(n_age)
+)
+
+# Summary
+out <- data.frame(
+  variable = c("Ever smoked one cigarette (p)", "Ever smoked marijuana (p)", "Age first approached (mean)"),
+  expected_estimate = c(p_cig, p_mj, mu_age),
+  element_variance_S2 = c(S2_cig, S2_mj, S2_age),
+  target_CV = cv_target,
+  desired_sampling_variance = c(varstar_cig, varstar_mj, varstar_age),
+  required_n_SRS_ignore_FPC = n_req
+)
+
+out
+
+```
 
 ## 5. Many-to-many matching: Maze.
 ### Examine by: 
 ### Prevalence:
 ### Solution:
+
