@@ -13,3 +13,12 @@ dataframe$desired_n <- ceiling(dataframe$element_var/dataframe$sampling_var)
 sampling_frame <- read.csv(file = 
                              "/Users/mihuynh/Library/Mobile Documents/com~apple~CloudDocs/Michigan Program in Survey and Data Science/WN 2026/SURVMETH 625/Sampling Project/MI_school_frame_head_counts.csv")
 unique(sampling_frame)
+
+regions_table <- read.csv(file = "/Users/mihuynh/Downloads/Regions of interest table - Sheet1.csv")
+library(dplyr)
+sampling_frame$tot_all <- as.numeric(sampling_frame$tot_all)
+stratified <- sampling_frame %>%
+  group_by(Region) %>%
+  summarise(count = sum(tot_all, na.rm = TRUE)) 
+  
+
