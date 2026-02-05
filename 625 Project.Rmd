@@ -175,3 +175,13 @@ name_dupes_within_district
 ### Examine by: 
 ### Prevalence:
 ### Solution:
+
+## Week 5: Prepare a table of population counts to each of the regions
+```{r}
+schoolframe$tot_all <- as.numeric(schoolframe$tot_all)
+
+regcounts <- schoolframe %>%
+  as_tibble() %>%
+  group_by(Region) %>%
+  summarise(Count = sum(tot_all, na.rm = TRUE))
+```
