@@ -231,3 +231,25 @@ regcounts <- schoolframe %>%
 ```
 =======
 >>>>>>> e008a3eea353607af19a564beeaf3f0f9cd772f4
+
+Week6: Interclass Correlation Coefficient (ICC) for clustering
+```{r}
+# Calculate Roh from Previou Study
+n_prev <- 7500
+a_prev <- 150
+m_prev <- n_prev / a_prev
+
+deff <- c(cig = 2.5, mj = 2.0, age = 1.7)
+
+roh <- (deff - 1)/(m_prev - 1)
+
+m_prev
+roh
+```
+
+# Optimal Allocation
+```{r}
+budget <- 500000
+cost_per_school <- 3000
+cost_per_student <- 50
+```
