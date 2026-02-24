@@ -276,6 +276,7 @@ opt_plan <- data.frame(
 
 opt_plan
 ```
+
 ```{r}
 # Use the largest m_opt across variables to ensure CV target is met for all
 m_overall <- max(m_opt)
@@ -340,22 +341,3 @@ f_overall <- n_overall / N_pop
 f_overall
 ```
 - Since the f is small, <0.05, we can keep excluding the FPC in variance calculations for it would have little impact.
-
-```{r}
-# Final summary table for the chosen sampling plan
-summary_3x <- data.frame(
-  variable = c("cig","mj","age"),
-  roh = as.numeric(roh),
-  m_opt_by_var = as.integer(m_opt),
-  m_used = m_overall,
-  a_used = a_overall,
-  n_used = n_overall,
-  deff_new = as.numeric(deff_new),
-  var_srs_new = as.numeric(var_srs_new),
-  var_clust_new = as.numeric(var_clust_new),
-  var_target = as.numeric(varstar),
-  cv_new = as.numeric(cv_new)
-)
-
-print(summary_3x)
-```
