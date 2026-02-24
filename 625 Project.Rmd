@@ -170,6 +170,14 @@ name_dupes_within_district <- schoolframe %>%
 name_dupes_within_district
 ```
 
+
+## 5. Many-to-many matching: Maze.
+### Examine by: 
+### Prevalence:
+### Solution:
+
+
+## Week4: SRS Sample Size
 ```{r}
 cv_target <- 0.05
 
@@ -214,11 +222,6 @@ out
 
 ```
 
-## 5. Many-to-many matching: Maze.
-### Examine by: 
-### Prevalence:
-### Solution:
-
 <<<<<<< HEAD
 ## Week 5: Prepare a table of population counts to each of the regions
 ```{r}
@@ -247,9 +250,112 @@ m_prev
 roh
 ```
 
-# Optimal Allocation
+Week 7: Optimal Sampling Plan
 ```{r}
 budget <- 500000
 cost_per_school <- 3000
 cost_per_student <- 50
+
+# Optimal m for each variable
+m_opt_raw <- sqrt(cost_per_school * (1 - roh) / (cost_per_student * roh))
+m_opt <- ceiling(m_opt_raw)   # round up to ensure CV target
+
+# Corresponding optimal number of clusters a and total n
+a_opt <- floor(budget / (cost_per_school + cost_per_student * m_opt))
+n_opt <- a_opt * m_opt
+
+opt_plan <- data.frame(
+  variable = names(roh),
+  roh = as.numeric(roh),
+  m_opt_raw = as.numeric(m_opt_raw),
+  m_opt = as.integer(m_opt),
+  a_opt = as.integer(a_opt),
+  n_opt = as.integer(n_opt),
+  cost_used = as.numeric(a_opt * (cost_per_school + cost_per_student * m_opt))
+)
+
+opt_plan
+```
+```{r}
+# Use the largest m_opt across variables to ensure CV target is met for all
+m_overall <- max(m_opt)
+m_overall
+```
+
+```{r}
+# Corresponding a and n for overall m
+a_overall <- floor(budget / (cost_per_school + cost_per_student * m_overall))
+n_overall <- a_overall * m_overall
+
+c(m_overall = m_overall, a_overall = a_overall, n_overall = n_overall,
+  cost_used = a_overall * (cost_per_school + cost_per_student * m_overall))
+```
+```{r}
+# New expected DEFFs under the chosen overall m
+deff_new <- 1 + (m_overall - 1) * roh
+
+# New expected SRS variances, ignoring FPC
+var_srs_new <- c(
+  cig = S2_cig / n_overall,
+  mj  = S2_mj  / n_overall,
+  age = S2_age / n_overall
+)
+
+# New expected sampling variances under cluster design
+var_clust_new <- deff_new * var_srs_new
+
+# CVs under new design
+cv_new <- c(
+  cig = sqrt(var_clust_new["cig"]) / p_cig,
+  mj  = sqrt(var_clust_new["mj"])  / p_mj,
+  age = sqrt(var_clust_new["age"]) / mu_age
+)
+
+# Compare to precision targets
+varstar <- c(cig = varstar_cig, mj = varstar_mj, age = varstar_age)
+
+precision_check <- data.frame(
+  variable = c("cig","mj","age"),
+  roh = as.numeric(roh),
+  m_used = m_overall,
+  a_used = a_overall,
+  n_used = n_overall,
+  deff_new = as.numeric(deff_new),
+  S2 = c(S2_cig, S2_mj, S2_age),
+  var_srs_new = as.numeric(var_srs_new),
+  var_clust_new = as.numeric(var_clust_new),
+  var_target = as.numeric(varstar),
+  meets_var_target = as.logical(var_clust_new <= varstar),
+  cv_new = as.numeric(cv_new),
+  meets_cv_target = as.logical(cv_new <= cv_target)
+)
+
+precision_check
+```
+
+```{r}
+# Calculate overall sample fraction
+N_pop <- 830138
+f_overall <- n_overall / N_pop
+f_overall
+```
+- Since the f is small, <0.05, we can keep excluding the FPC in variance calculations for it would have little impact.
+
+```{r}
+# Final summary table for the chosen sampling plan
+summary_3x <- data.frame(
+  variable = c("cig","mj","age"),
+  roh = as.numeric(roh),
+  m_opt_by_var = as.integer(m_opt),
+  m_used = m_overall,
+  a_used = a_overall,
+  n_used = n_overall,
+  deff_new = as.numeric(deff_new),
+  var_srs_new = as.numeric(var_srs_new),
+  var_clust_new = as.numeric(var_clust_new),
+  var_target = as.numeric(varstar),
+  cv_new = as.numeric(cv_new)
+)
+
+print(summary_3x)
 ```
