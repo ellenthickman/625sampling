@@ -305,7 +305,7 @@ var_srs_new <- c(
 # New expected sampling variances under cluster design
 var_clust_new <- deff_new * var_srs_new
 
-# CVs under new design
+# CVs under new design, standard deviation/mean, expected mean values from week4 input
 cv_new <- c(
   cig = sqrt(var_clust_new["cig"]) / p_cig,
   mj  = sqrt(var_clust_new["mj"])  / p_mj,
