@@ -28,7 +28,7 @@ schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625samp
 kable(schoolframe)
 ```
 
-# Sampling Frame Analysis
+## Week 3: Sampling Frame Analysis
 ## 1. Noncoverage
 ### Examine by: searching current # of MI schools (eg. charter). See: https://www.mischooldata.org/student-enrollment-counts-report/
 ### Prevalence:
@@ -177,7 +177,7 @@ name_dupes_within_district
 ### Solution:
 
 
-## Week4: SRS Sample Size
+## Week 4: SRS Sample Size
 ```{r}
 cv_target <- 0.05
 
@@ -222,7 +222,6 @@ out
 
 ```
 
-<<<<<<< HEAD
 ## Week 5: Prepare a table of population counts to each of the regions
 ```{r}
 schoolframe$tot_all <- as.numeric(schoolframe$tot_all)
@@ -232,12 +231,10 @@ regcounts <- schoolframe %>%
   group_by(Region) %>%
   summarise(Count = sum(tot_all, na.rm = TRUE))
 ```
-=======
->>>>>>> e008a3eea353607af19a564beeaf3f0f9cd772f4
 
-Week6: Interclass Correlation Coefficient (ICC) for clustering
+## Week 6: Interclass Correlation Coefficient (ICC) for clustering
 ```{r}
-# Calculate Roh from Previou Study
+# Calculate Roh from Previous Study
 n_prev <- 7500
 a_prev <- 150
 m_prev <- n_prev / a_prev
@@ -250,7 +247,7 @@ m_prev
 roh
 ```
 
-Week 7: Optimal Sampling Plan
+## Week 7: Optimal Sampling Plan
 ```{r}
 budget <- 500000
 cost_per_school <- 3000
@@ -341,3 +338,71 @@ f_overall <- n_overall / N_pop
 f_overall
 ```
 - Since the f is small, <0.05, we can keep excluding the FPC in variance calculations for it would have little impact.
+
+### Looping over each variable's optimal allocation
+```{r}
+# Store results
+precision_tables <- list()
+
+for(i in 1:nrow(opt_plan)) {
+  
+  # Extract optimal design values for this variable
+  m_overall <- opt_plan$m_opt[i]
+  a_overall <- opt_plan$a_opt[i]
+  n_overall <- opt_plan$n_opt[i]
+  
+  # New expected DEFFs under this m
+  deff_new <- 1 + (m_overall - 1) * roh
+  
+  # New expected SRS variances
+  var_srs_new <- c(
+    cig = S2_cig / n_overall,
+    mj  = S2_mj  / n_overall,
+    age = S2_age / n_overall
+  )
+  
+  # Cluster design variances
+  var_clust_new <- deff_new * var_srs_new
+  
+  # CVs under new design
+  cv_new <- c(
+    cig = sqrt(var_clust_new["cig"]) / p_cig,
+    mj  = sqrt(var_clust_new["mj"])  / p_mj,
+    age = sqrt(var_clust_new["age"]) / mu_age
+  )
+  
+  # Targets
+  varstar <- c(cig = varstar_cig, mj = varstar_mj, age = varstar_age)
+  
+  # Precision check table
+  precision_tables[[ opt_plan$variable[i] ]] <- data.frame(
+    variable = c("cig","mj","age"),
+    roh = as.numeric(roh),
+    m_used = m_overall,
+    a_used = a_overall,
+    n_used = n_overall,
+    deff_new = as.numeric(deff_new),
+    S2 = c(S2_cig, S2_mj, S2_age),
+    var_srs_new = as.numeric(var_srs_new),
+    var_clust_new = as.numeric(var_clust_new),
+    var_target = as.numeric(varstar),
+    meets_var_target = as.logical(var_clust_new <= varstar),
+    cv_new = as.numeric(cv_new),
+    meets_cv_target = as.logical(cv_new <= cv_target)
+  )
+}
+
+# View tables
+precision_tables$cig
+precision_tables$mj
+precision_tables$age
+```
+
+## Week 8
+1. First-stage sampling fractions (f) for each stratum (proportional allocation of the 63 schools)
+2. PPeS selection of schools for each 9 strata
+3. Sort the list to achieve implicit stratification within the regions, using tot_all as MOS
+4. Compute your zone size for systematic PPeS sampling within each of the 9 strata
+5. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Actual size)
+6. First-stage sampling fraction (f) within each of the nine strata under PPes
+7. Form pseudo-strata to meet paired selection model to estimate sampling variance
