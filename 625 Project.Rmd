@@ -392,10 +392,23 @@ for(i in 1:nrow(opt_plan)) {
   )
 }
 
+precision_tables$cig <- precision_tables$cig %>% 
+  mutate(cost_used = as.numeric(a_used * (cost_per_school + cost_per_student * m_used)))
+precision_tables$mj <- precision_tables$mj %>% 
+  mutate(cost_used = as.numeric(a_used * (cost_per_school + cost_per_student * m_used)))
+precision_tables$age <- precision_tables$age %>% 
+  mutate(cost_used = as.numeric(a_used * (cost_per_school + cost_per_student * m_used)))
+
 # View tables
 precision_tables$cig
 precision_tables$mj
 precision_tables$age
+
+# a is the number of schools
+# m is the number of clusters
+# 9 strata
+# As clusters increase, variance also increase because homogeneity increases
+# A lower CV is better because there's less variation between samples
 ```
 
 ## Week 8
