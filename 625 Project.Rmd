@@ -419,3 +419,43 @@ precision_tables$age
 5. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Actual size)
 6. First-stage sampling fraction (f) within each of the nine strata under PPes
 7. Form pseudo-strata to meet paired selection model to estimate sampling variance
+
+```{r}
+# Proportional allocation
+N_allocate <- sum(regcounts$Count)
+n_used <- 4698
+m_used <- 54
+a_used <- 87
+regcounts$weight <- regcounts$Count/N_allocate
+regcounts$prop_allocation <- round(regcounts$weight * n_used)
+regcounts$prop_allocation[6] <- 187 # Round down because it was 187.5
+sum(regcounts$prop_allocation)
+
+
+# Proportionate allocation is the number of students in each strata if we choose n=4698 from the precision tables
+
+# PPeS
+# Probabilities proportionate to estimated size
+f <- n_used/sum(schoolframe$tot_all) # 4698 / total of all elements 
+
+# Step 3: Sort the list
+schoolframe_sorted <- schoolframe %>%
+  arrange(Region, tot_all)
+schoolframe_sorted$rates <- n_used * schoolframe$tot_all/sum(schoolframe$tot_all)
+
+# Step 4: Zone size
+zone_size <- sum(schoolframe$tot_all)/m_used # sum of tot_all (MOS) / 54
+
+# Step 5
+random_start <- sample(1:zone_size, 1) # Random number generator here
+random_start <- 2571 # Because we had to store the random number
+selection <- random_start + zone_size
+
+# Trying UPsystematic function
+library(sampling)
+pik <- schoolframe_sorted$rates
+s=UPsystematic(pik = pik)
+which(s==1)
+length(s)
+ss <- getdata(schoolframe_sorted,s)
+```
