@@ -446,7 +446,11 @@ regcounts$m_h[regcounts$m_h == 0] <- regcounts$m_h[regcounts$m_h == 0] + 1
 # Subtract 1 from region 9
 regcounts$m_h[regcounts$Region == 9] <- regcounts$m_h[regcounts$Region == 9] - 1 
 
+# Paired
+regcounts$m_h_pair <- c(2,2,2,2,2,2,10,10,22) #Evenly allocated to avoid singleton problem. Noting Strata 6 is now underrepresented compared to adjusted strata #1-5
+
 sum(regcounts$m_h)
+sum(regcounts$m_h_pair)
 
 # Proportionate allocation of schools across strata
 regcounts
@@ -482,20 +486,20 @@ zone\ size = \frac{\sum_{i\epsilon h}{MOS_{hi}}}{n_h}
 $$
 B. Calculate 
 ```{r}
-regcounts$zone_size <- sum(regcounts$Count) / regcounts$m_h; regcounts
+regcounts$zone_size <- sum(regcounts$Count) / regcounts$m_h_pair; regcounts
 ```
 
 4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
 ```{r}
 # Step 5: PPeS systematic selection within each stratum
-sselected_schools <- list()
+selected_schools <- list()
 
 for(r in unique(schoolframe_sorted$Region)) {
   
   frame_r <- schoolframe_sorted %>%
     filter(Region == r)
   
-  m_h_r <- regcounts$m_h[regcounts$Region == r]
+  m_h_r <- regcounts$m_h_pair[regcounts$Region == r]
   M_h_r <- sum(frame_r$tot_all, na.rm = TRUE)
   
   # Skip if no schools allocated to this region
@@ -532,7 +536,7 @@ selected_counts <- selected_schools_df %>%
   summarise(selected_schools = n(), .groups = "drop")
 
 regcounts %>%
-  select(Region, m_h) %>%
+  select(Region, m_h_pair) %>%
   left_join(selected_counts, by = "Region")
 ```
 5. Report first-stage sampling fraction (f) within each of the nine strata under PPes
@@ -557,19 +561,7 @@ selected_schools_df %>%
 
 6. Form pseudo-strata to meet paired selection model to estimate sampling variance
 ```{r}
-# Step 7: Pseudo-strata for paired variance estimation
-selected_schools_df <- selected_schools_df %>% # sort by region and MOS
-  arrange(Region, tot_all) %>% # create pseudo-strata by pairing schools within each region
-  group_by(Region) %>%
-  mutate(
-    order_in_region = row_number(), # order schools within region by MOS
-     # each pair of schools gets the same pseudo-stratum ID within the region
-    pseudo_stratum = ceiling(order_in_region / 2) 
-  ) %>%
-  ungroup()
 
-selected_schools_df %>%
-  select(Region, BCODE, tot_all, pseudo_stratum)
 ```
 
 ## Week 10
@@ -609,7 +601,7 @@ selected_schools_df %>%
 
 4. Write down the overall sampling fraction based on the stratified PPeS design, indicating the overall probability of inclusion for a given student, from a given school (or linked set of schools), in a given stratum. Be careful with notation. Keep in mind that the MOS (Measure of Size) values used for the sampled schools at the first stage and the denominator at the second stage (Did you sample a single school? Or a linked set of schools?) will depend on your response to Task #2 above.
 
-RECYCLE BIN
+### RECYCLE BIN ###
 A. Overall sampling rate (Lec. 8 PPeS, p. 58)
 $$
 f = \frac{ma*}{\sum_{i\epsilon h}MOS_{hi}}; where\\ 
@@ -645,3 +637,18 @@ F. f_h
 $$
 f_h = \frac{n_hm_h^*}{\sum_{i\epsilon h}MOS_{hi}}
 $$
+```{r}
+# Step 6: Pseudo-strata for paired variance estimation
+selected_schools_df <- selected_schools_df %>% # sort by region and MOS
+  arrange(Region, tot_all) %>% # create pseudo-strata by pairing schools within each region
+  group_by(Region) %>%
+  mutate(
+    order_in_region = row_number(), # order schools within region by MOS
+     # each pair of schools gets the same pseudo-stratum ID within the region
+    pseudo_stratum = ceiling(order_in_region / 2) 
+  ) %>%
+  ungroup()
+
+selected_schools_df %>%
+  select(Region, BCODE, tot_all, pseudo_stratum)
+```
