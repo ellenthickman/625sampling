@@ -475,7 +475,7 @@ schoolframe_sorted <- schoolframe %>%
   arrange(Region, tot_all)
 ```
 
-4. Compute your zone size (Fractional intervals) for systematic PPeS sampling within each of the 9 strata
+3. Compute your zone size (Fractional intervals) for systematic PPeS sampling within each of the 9 strata
 A. Zone size
 $$
 zone\ size = \frac{\sum_{i\epsilon h}{MOS_{hi}}}{n_h}
@@ -485,7 +485,7 @@ B. Calculate
 regcounts$zone_size <- sum(regcounts$Count) / regcounts$m_h; regcounts
 ```
 
-5. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
+4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
 ```{r}
 # Step 5: PPeS systematic selection within each stratum
 sselected_schools <- list()
@@ -535,7 +535,7 @@ regcounts %>%
   select(Region, m_h) %>%
   left_join(selected_counts, by = "Region")
 ```
-6. Report first-stage sampling fraction (f) within each of the nine strata under PPes
+5. Report first-stage sampling fraction (f) within each of the nine strata under PPes
 A. First stage sampling fraction
 $$
 f_i = \frac{MOS_i}{zone\ size}
@@ -555,7 +555,7 @@ selected_schools_df %>%
   select(Region, BCODE, tot_all, pik) # school-level first-stage fraction: pik = m_h * tot_all / M_h
 ```
 
-7. Form pseudo-strata to meet paired selection model to estimate sampling variance
+6. Form pseudo-strata to meet paired selection model to estimate sampling variance
 ```{r}
 # Step 7: Pseudo-strata for paired variance estimation
 selected_schools_df <- selected_schools_df %>% # sort by region and MOS
