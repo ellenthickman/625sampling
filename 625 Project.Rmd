@@ -492,6 +492,7 @@ regcounts$zone_size <- sum(regcounts$Count) / regcounts$m_h_pair; regcounts
 4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
 ```{r}
 # Step 5: PPeS systematic selection within each stratum
+library(sampling)
 selected_schools <- list()
 
 for(r in unique(schoolframe_sorted$Region)) {
@@ -561,7 +562,20 @@ selected_schools_df %>%
 
 6. Form pseudo-strata to meet paired selection model to estimate sampling variance
 ```{r}
+selected_schools_df <- selected_schools_df %>%
+  arrange(Region, tot_all) %>%   # keep the PPS-selected schools in sorted order within region
+  group_by(Region) %>%
+  mutate(
+    order_in_region = row_number(),
+    pseudo_stratum_within_region = ceiling(order_in_region / 2) # create pseudo-strata of size 2 within each region for paired variance estimation
+  ) %>%
+  ungroup()
 
+# Unique pseudo-stratum ID across regions
+selected_schools_df <- selected_schools_df %>%
+  mutate(
+    pseudo_stratum_id = paste0("R", Region, "_P", pseudo_stratum_within_region)
+  )
 ```
 
 ## Week 10
@@ -570,12 +584,12 @@ selected_schools_df %>%
 # Step 1: Required number of students per sampled school to maintain epsem
 
 # number of students to sample per school in each stratum to maintain epsem
-regcounts$b_h_raw <- regcounts$n_h / regcounts$m_h
+regcounts$b_h_raw <- regcounts$n_h / regcounts$m_h_pair
 # Round up to ensure we meet the required number of students per stratum
 regcounts$b_h <- ceiling(regcounts$b_h_raw)
 
 regcounts %>%
-  select(Region, n_h, m_h, b_h_raw, b_h)
+  select(Region, n_h, m_h_pair, b_h_raw, b_h)
 ```
 
 2. Do each of the schools that you sampled in a given region have the minimum sufficient size, given the stratum-specific subsample sizes computed in Task #1 (Week 10)? Do subsequent schools on the list have the minimum sufficient size? If not, what will you do?
@@ -637,18 +651,4 @@ F. f_h
 $$
 f_h = \frac{n_hm_h^*}{\sum_{i\epsilon h}MOS_{hi}}
 $$
-```{r}
-# Step 6: Pseudo-strata for paired variance estimation
-selected_schools_df <- selected_schools_df %>% # sort by region and MOS
-  arrange(Region, tot_all) %>% # create pseudo-strata by pairing schools within each region
-  group_by(Region) %>%
-  mutate(
-    order_in_region = row_number(), # order schools within region by MOS
-     # each pair of schools gets the same pseudo-stratum ID within the region
-    pseudo_stratum = ceiling(order_in_region / 2) 
-  ) %>%
-  ungroup()
 
-selected_schools_df %>%
-  select(Region, BCODE, tot_all, pseudo_stratum)
-```
