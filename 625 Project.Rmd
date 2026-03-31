@@ -25,7 +25,6 @@ options(scipen = 999)
 ## Download data
 ```{r}
 schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv")
-kable(schoolframe)
 ```
 
 ## Week 3: Sampling Frame Analysis
@@ -52,7 +51,7 @@ tab3 <- table(factor(schoolframe$District_Name == "", levels = c(TRUE, FALSE)),
              factor(schoolframe$Region))
 kable(prop.table(tab3, margin = 2))
 # c. By district code, let's check:
-tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == ""); kable(tab4)
+tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == "")
 ```
 From Tables 1-3, we see that the majority of missing district name cases (547/559, 98%) belong to non-public (ie. private) schools, whereas only a handful of public schools are missing district names (12/1884, ~0.0%). It also looks like even though the private schools are missing District Names, they do belong to a District Code that other, public schools are also a part of. 
 
@@ -486,7 +485,7 @@ zone\ size = \frac{\sum_{i\epsilon h}{MOS_{hi}}}{n_h}
 $$
 B. Calculate 
 ```{r}
-regcounts$zone_size <- sum(regcounts$Count) / regcounts$m_h_pair; regcounts
+regcounts$zone_size <- sum(regcounts$Count) / regcounts$n_h; regcounts
 ```
 
 4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
@@ -553,7 +552,7 @@ C. Report: First-stage sampling fraction within each stratum under PPeS
 ```{r}
 # Stratum-level first-stage sampling fraction
 regcounts %>%
-  select(Region, Count, m_h, zone_size, f_i) # stratum-level first-stage fraction: f_h^ = m_h/m_h
+  select(Region, Count, m_h_pair, zone_size, f_i) # stratum-level first-stage fraction: f_h^ = m_h/m_h
 
 # School-level PPeS first-stage inclusion probabilities
 selected_schools_df %>%
@@ -612,8 +611,21 @@ selected_schools_df %>%
 ```
 
 3. Begin to describe how you will physically select the subsample of students within a given sampled school (or set of linked schools). What will your second-stage sampling rate be for a given school within a given stratum? How will you acquire the updated rosters from each school? What technique will you use to select the sample at the specified second-stage Rate?
+```{r}
+# Second stage sampling rate
+# f / f_i 
+regcounts$f_h <- (regcounts$m_h*regcounts$n_h)/regcounts$Count
+# Overall f for each stratum (f = m_h*n_h)/MOS_h
+regcounts$subsample_rate <- regcounts$f_h/regcounts$f_i
+regcounts$m_star <- regcounts$subsample_rate*regcounts$Count
+```
+
 
 4. Write down the overall sampling fraction based on the stratified PPeS design, indicating the overall probability of inclusion for a given student, from a given school (or linked set of schools), in a given stratum. Be careful with notation. Keep in mind that the MOS (Measure of Size) values used for the sampled schools at the first stage and the denominator at the second stage (Did you sample a single school? Or a linked set of schools?) will depend on your response to Task #2 above.
+```{r}
+overall_f <- sum(regcounts$f_h)
+# overall_f <- (54*4698)/830138
+```
 
 ### RECYCLE BIN ###
 A. Overall sampling rate (Lec. 8 PPeS, p. 58)
