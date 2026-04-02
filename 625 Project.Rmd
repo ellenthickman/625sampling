@@ -627,6 +627,64 @@ overall_f <- sum(regcounts$f_h)
 # overall_f <- (54*4698)/830138
 ```
 
+## Week 11
+### Download data
+```{r}
+studentlist <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/main/sample_school_student_list.csv")
+head(studentlist)
+```
+
+1. Find subsampling rate of region 7
+$$
+f_{j|i} = \frac{m^*_h}{MOS_h}
+$$
+$$
+x_i = f_{j|i} * M_h
+$$
+a. Input known values
+```{r}
+mstar_7 = 12
+MOS_7 = 242
+
+M_7 = 219 #Actual size of school. To find x_7
+```
+b. Calculate
+```{r}
+fji_7 <- mstar_7 / MOS_7; fji_7
+
+x_7 <- fji_7 * M_7; x_7
+```
+2. Find two seperate probabilities
+$$
+x_7 = x_1(1-p)+x_2(p)
+$$
+a. Fractional interval (inverse of subsampling rate)
+$$
+\frac{1}{f_{j|i}}
+$$
+
+```{r}
+p <- 0.8595
+
+x_7_compare <- 11*(p)+10*(1-p)
+x_7; x_7_compare #Verify
+```
+3. Report
+```{r}
+1/fji_7; p; 1-p
+```
+With a fractional interval 20.17, select a sample of 11 employees with
+probability 0.86 or a sample of 10 employees with probability 0.14.
+
+3. Select 
+The sample is sorted by grade (7->8) then grouped by teacher (random)
+
+a. Proportion of students within each grade
+```{r}
+table(studentlist$Grade)
+```
+
+
 ### RECYCLE BIN ###
 A. Overall sampling rate (Lec. 8 PPeS, p. 58)
 $$
