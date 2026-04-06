@@ -3,8 +3,8 @@ title: "625 Sampling Project"
 author: "Ellen Hickman, Mi Huynh, Maze Nead & Zupeng Zeng"
 date: "2026-01-21"
 output:
-  pdf_document: default
   word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -25,6 +25,7 @@ options(scipen = 999)
 ## Download data
 ```{r}
 schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv")
+kable(schoolframe)
 ```
 
 ## Week 3: Sampling Frame Analysis
@@ -51,7 +52,7 @@ tab3 <- table(factor(schoolframe$District_Name == "", levels = c(TRUE, FALSE)),
              factor(schoolframe$Region))
 kable(prop.table(tab3, margin = 2))
 # c. By district code, let's check:
-tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == "")
+tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == ""); kable(tab4)
 ```
 From Tables 1-3, we see that the majority of missing district name cases (547/559, 98%) belong to non-public (ie. private) schools, whereas only a handful of public schools are missing district names (12/1884, ~0.0%). It also looks like even though the private schools are missing District Names, they do belong to a District Code that other, public schools are also a part of. 
 
@@ -411,87 +412,93 @@ precision_tables$age
 ```
 
 ## Week 8
-1. First-stage sampling fractions for each stratum, where the total number of schools to sample at the first stage in each stratum is defined by your proportionate allocation of the $n_opt$ clusters.
-A. Proportionate allocation
-$$
-\frac{N_h}{N} = W_h
-$$
-$$
-n_h = n * \frac{N_h}{N} = n * W_h
-$$
-B. Input known values
+1. First-stage sampling fractions (f) for each stratum (proportional allocation of the 63 schools)
+2. PPeS selection of schools for each 9 strata
+3. Sort the list to achieve implicit stratification within the regions, using tot_all as MOS
+4. Compute your zone size for systematic PPeS sampling within each of the 9 strata
+5. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Actual size)
+6. First-stage sampling fraction (f) within each of the nine strata under PPes
+7. Form pseudo-strata to meet paired selection model to estimate sampling variance
+
 ```{r}
-n <- 4698 # Total overall n
-m <- 54 # No. of schools (clusters)
-a <- 87 # No. of students within school (cluster size)
-regcounts[1:2]
+# Proportional allocation
+N_allocate <- sum(regcounts$Count)
+n_used <- 4698
+m_used <- 54
+a_used <- 87
 
-#Calculate stratum weight
-regcounts$w_h <- regcounts$Count/sum(regcounts$Count)
-```
-C. Calculate total number of schools to sample at the first stage in each stratum (m)
-```{r}
-regcounts$m_h_raw <- regcounts$w_h * m
-regcounts$m_h_round <- round(regcounts$m_h_raw); sum(regcounts$m_h_round)
+# Step 1: Allocate number of schools across strata
+regcounts$weight <- regcounts$Count / N_allocate
+regcounts$a_h_raw <- regcounts$weight * a_used
+regcounts$a_h_floor <- floor(regcounts$a_h_raw)
+regcounts$frac_a <- regcounts$a_h_raw - regcounts$a_h_floor
 
-m - sum(regcounts$m_h_round) # Number of schools left to allocate after rounding
+r_a <- a_used - sum(regcounts$a_h_floor) # Number of schools left to allocate after flooring
 
-# Initialize
-regcounts$m_h <- regcounts$m_h_round
+regcounts <- regcounts %>%
+  arrange(desc(frac_a)) %>%
+  mutate(add_a = ifelse(row_number() <= r_a, 1, 0)) %>% # Add 1 to the top r_a strata with the largest fractional parts
+  arrange(Region)
 
-#Add 1 to the lowest three strata from the largest three strata to achieve 9 strata
-regcounts$m_h[regcounts$m_h == 0] <- regcounts$m_h[regcounts$m_h == 0] + 1
-
-# Subtract 1 from region 9
-regcounts$m_h[regcounts$Region == 9] <- regcounts$m_h[regcounts$Region == 9] - 1 
-
-# Paired
-regcounts$m_h_pair <- c(2,2,2,2,2,2,10,10,22) #Evenly allocated to avoid singleton problem. Noting Strata 6 is now underrepresented compared to adjusted strata #1-5
-
-sum(regcounts$m_h)
-sum(regcounts$m_h_pair)
+regcounts$a_h <- regcounts$a_h_floor + regcounts$add_a  # Final allocated number of schools per stratum after adjusting for rounding
+sum(regcounts$a_h)
 
 # Proportionate allocation of schools across strata
 regcounts
-```
-D. Calculate total number of schools to sample at the first stage in each stratum (n) (EXTRA)
-```{r}
-#Calculate sample size within each stratum
-regcounts$n_raw <- (n*regcounts$w_h); regcounts
 
-#Round down strata #6 since f_i is closest to .50 threshold & Round to nearest integer for all else
+# Step 2: Allocate total students across strata
+regcounts$n_h_raw <- regcounts$weight * n_used
+regcounts$n_h_floor <- floor(regcounts$n_h_raw)
+regcounts$frac_n <- regcounts$n_h_raw - regcounts$n_h_floor
+
+r_n <- n_used - sum(regcounts$n_h_floor)
+
 regcounts <- regcounts %>%
-  mutate(
-    n_raw = (n * Count) / sum(Count),
-    n_h = ifelse(Region == 6, floor(n_raw), round(n_raw))
-  )
+  arrange(desc(frac_n)) %>%
+  mutate(add_n = ifelse(row_number() <= r_n, 1, 0)) %>%
+  arrange(Region)
 
-sum(regcounts$n_h); regcounts
-```
+regcounts$n_h <- regcounts$n_h_floor + regcounts$add_n
+sum(regcounts$n_h)
 
-2. Sort the list to achieve implicit stratification within the regions, using tot_all from previous year as MOS
-A. Sort the list
-```{r}
+# Proportionate allocation of students across strata
+regcounts
+
+# Proportionate allocation is the number of students in each strata if we choose n=4698 from the precision tables
+
+# PPeS
+# Probabilities proportionate to estimated size
+f <- n_used/sum(schoolframe$tot_all) # 4698 / total of all elements 
+
+# Step 3: Sort the list
 schoolframe$tot_all <- as.numeric(gsub(",", "", as.character(schoolframe$tot_all)))
 
 schoolframe_sorted <- schoolframe %>%
   arrange(Region, tot_all)
-```
 
-3. Compute your zone size (Fractional intervals) for systematic PPeS sampling within each of the 9 strata
-A. Zone size
-$$
-zone\ size = \frac{\sum_{i\epsilon h}{MOS_{hi}}}{n_h}
-$$
-B. Calculate 
-```{r}
-regcounts$zone_size <- sum(regcounts$Count) / regcounts$n_h; regcounts
-```
+# Step 4: Zone size
+school_counts <- schoolframe_sorted %>%
+  as_tibble() %>%
+  group_by(Region) %>%
+  summarise(
+    A_h = n(),                          # number of schools in stratum
+    M_h = sum(tot_all, na.rm = TRUE),   # total MOS in stratum
+    .groups = "drop"
+  )
 
-4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
-```{r}
+regcounts <- regcounts %>%
+  left_join(school_counts, by = "Region")
+
+regcounts$zone_size <- regcounts$M_h / regcounts$a_h
+
+# First-stage school sampling fraction in each stratum
+regcounts$f1_h <- regcounts$a_h / regcounts$A_h
+
+regcounts
+
 # Step 5: PPeS systematic selection within each stratum
 library(sampling)
+
 selected_schools <- list()
 
 for(r in unique(schoolframe_sorted$Region)) {
@@ -499,14 +506,14 @@ for(r in unique(schoolframe_sorted$Region)) {
   frame_r <- schoolframe_sorted %>%
     filter(Region == r)
   
-  m_h_r <- regcounts$m_h_pair[regcounts$Region == r]
+  a_h_r <- regcounts$a_h[regcounts$Region == r]
   M_h_r <- sum(frame_r$tot_all, na.rm = TRUE)
   
   # Skip if no schools allocated to this region
-  if(length(m_h_r) == 0 || m_h_r == 0) next
+  if(length(a_h_r) == 0 || a_h_r == 0) next
   
   # PPeS inclusion probabilities within stratum
-  pik <- m_h_r * frame_r$tot_all / M_h_r
+  pik <- a_h_r * frame_r$tot_all / M_h_r
   
   # to be safe: cap at 1
   pik[pik > 1] <- 1
@@ -536,63 +543,52 @@ selected_counts <- selected_schools_df %>%
   summarise(selected_schools = n(), .groups = "drop")
 
 regcounts %>%
-  select(Region, m_h_pair) %>%
+  select(Region, a_h) %>%
   left_join(selected_counts, by = "Region")
-```
-5. Report first-stage sampling fraction (f) within each of the nine strata under PPes
-A. First stage sampling fraction
-$$
-f_i = \frac{MOS_i}{zone\ size}
-$$
-B. Calculate
-```{r}
-regcounts$f_i <- regcounts$Count / regcounts$zone_size
-```
-C. Report: First-stage sampling fraction within each stratum under PPeS
-```{r}
+
+
+# Step 6: First-stage sampling fraction within each stratum under PPeS
 # Stratum-level first-stage sampling fraction
 regcounts %>%
-  select(Region, Count, m_h_pair, zone_size, f_i) # stratum-level first-stage fraction: f_h^ = m_h/m_h
+  select(Region, A_h, a_h, f1_h, M_h, zone_size) # stratum-level first-stage fraction: f_h^ = a_h/A_h
 
 # School-level PPeS first-stage inclusion probabilities
 selected_schools_df %>%
-  select(Region, BCODE, tot_all, pik) # school-level first-stage fraction: pik = m_h * tot_all / M_h
-```
+  select(Region, BCODE, tot_all, pik) # school-level first-stage fraction: pik = a_h * tot_all / M_h
 
-6. Form pseudo-strata to meet paired selection model to estimate sampling variance
-```{r}
-selected_schools_df <- selected_schools_df %>%
-  arrange(Region, tot_all) %>%   # keep the PPS-selected schools in sorted order within region
+
+# Step 7: Pseudo-strata for paired variance estimation
+selected_schools_df <- selected_schools_df %>% # sort by region and MOS
+  arrange(Region, tot_all) %>% # create pseudo-strata by pairing schools within each region
   group_by(Region) %>%
   mutate(
-    order_in_region = row_number(),
-    pseudo_stratum_within_region = ceiling(order_in_region / 2) # create pseudo-strata of size 2 within each region for paired variance estimation
+    order_in_region = row_number(), # order schools within region by MOS
+     # each pair of schools gets the same pseudo-stratum ID within the region
+    pseudo_stratum = ceiling(order_in_region / 2) 
   ) %>%
   ungroup()
 
-# Unique pseudo-stratum ID across regions
-selected_schools_df <- selected_schools_df %>%
-  mutate(
-    pseudo_stratum_id = paste0("R", Region, "_P", pseudo_stratum_within_region)
-  )
+selected_schools_df %>%
+  select(Region, BCODE, tot_all, pseudo_stratum)
 ```
 
 ## Week 10
 1. For each of the nine strata, compute the required number of students to subsample from each sampled school based on the stratified PPeS design in order to maintain epsem across all (9) strata.
+2. Do each of the schools that you sampled in a given region have the minimum sufficient size, given the stratum-specific subsample sizes computed in Task #1 (Week 10)? Do subsequent schools on the list have the minimum sufficient size? If not, what will you do?
+3. Begin to describe how you will physically select the subsample of students within a given sampled school (or set of linked schools). What will your second-stage sampling rate be for a given school within a given stratum? How will you acquire the updated rosters from each school? What technique will you use to select the sample at the specified second-stage Rate?
+4. Write down the overall sampling fraction based on the stratified PPeS design, indicating the overall probability of inclusion for a given student, from a given school (or linked set of schools), in a given stratum. Be careful with notation. Keep in mind that the MOS (Measure of Size) values used for the sampled schools at the first stage and the denominator at the second stage (Did you sample a single school? Or a linked set of schools?) will depend on your response to Task #2 above.
+
 ```{r}
 # Step 1: Required number of students per sampled school to maintain epsem
 
 # number of students to sample per school in each stratum to maintain epsem
-regcounts$b_h_raw <- regcounts$n_h / regcounts$m_h_pair
+regcounts$b_h_raw <- regcounts$n_h / regcounts$a_h
 # Round up to ensure we meet the required number of students per stratum
 regcounts$b_h <- ceiling(regcounts$b_h_raw)
 
 regcounts %>%
-  select(Region, n_h, m_h_pair, b_h_raw, b_h)
-```
+  select(Region, n_h, a_h, b_h_raw, b_h)
 
-2. Do each of the schools that you sampled in a given region have the minimum sufficient size, given the stratum-specific subsample sizes computed in Task #1 (Week 10)? Do subsequent schools on the list have the minimum sufficient size? If not, what will you do?
-```{r}
 # Step 2: Check if sampled schools have sufficient size
 selected_schools_df <- selected_schools_df %>%
   left_join(regcounts %>% select(Region, b_h), by = "Region") %>%
@@ -609,162 +605,3 @@ selected_schools_df %>%
   filter(!sufficient_size) %>%
   select(Region, BCODE, tot_all, b_h)
 ```
-
-3. Begin to describe how you will physically select the subsample of students within a given sampled school (or set of linked schools). What will your second-stage sampling rate be for a given school within a given stratum? How will you acquire the updated rosters from each school? What technique will you use to select the sample at the specified second-stage Rate?
-```{r}
-# Second stage sampling rate
-# f / f_i 
-regcounts$f_h <- (regcounts$m_h*regcounts$n_h)/regcounts$Count
-# Overall f for each stratum (f = m_h*n_h)/MOS_h
-regcounts$subsample_rate <- regcounts$f_h/regcounts$f_i
-regcounts$m_star <- regcounts$subsample_rate*regcounts$Count
-```
-
-
-4. Write down the overall sampling fraction based on the stratified PPeS design, indicating the overall probability of inclusion for a given student, from a given school (or linked set of schools), in a given stratum. Be careful with notation. Keep in mind that the MOS (Measure of Size) values used for the sampled schools at the first stage and the denominator at the second stage (Did you sample a single school? Or a linked set of schools?) will depend on your response to Task #2 above.
-```{r}
-overall_f <- sum(regcounts$f_h)
-# overall_f <- (54*4698)/830138
-```
-
-## Week 11
-### Download data
-```{r}
-studentlist <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/main/sample_school_student_list.csv")
-head(studentlist)
-```
-
-1. Find subsampling rate of region 7
-$$
-f_{j|i} = \frac{m^*_h}{MOS_h}
-$$
-$$
-x_i = f_{j|i} * M_h
-$$
-a. Input known values
-```{r}
-mstar_7 = 12
-MOS_7 = 242
-
-M_7 = 219 #Actual size of school. To find x_7
-```
-b. Calculate
-```{r}
-fji_7 <- mstar_7 / MOS_7; fji_7
-
-x_7 <- fji_7 * M_7; x_7
-```
-2. Find two seperate probabilities
-$$
-x_7 = x_1(1-p)+x_2(p)
-$$
-a. Fractional interval (inverse of subsampling rate)
-$$
-\frac{1}{f_{j|i}}
-$$
-
-```{r}
-p <- 0.8595
-
-x_7_compare <- 11*(p)+10*(1-p)
-x_7; x_7_compare #Verify
-```
-3. Report
-```{r}
-1/fji_7; p; 1-p
-```
-With a fractional interval 20.17, select a sample of 11 students with
-probability 0.86 or a sample of 10 students with probability 0.14. Selecting a proportionate sample with respect to grade.
-
-3. Select 
-The sample is sorted by grade (7->8) then grouped by teacher (random)
-
-a. Proportion of students within each grade
-```{r}
-table(studentlist$Grade) 
-
-set.seed(123)  # for reproducibility
-
-# --- Step 1: Decide sample size (10 or 11) ---
-u <- runif(1)
-
-n_total <- ifelse(u <= 0.86, 11, 10)
-
-# --- Step 2: Proportionate allocation by grade ---
-grade_counts <- table(studentlist$Grade)
-N <- sum(grade_counts)
-
-# proportional allocation
-n_by_grade <- n_total * (grade_counts / N)
-
-# round to integers
-n_by_grade <- round(n_by_grade)
-
-# adjust to ensure sum = n_total
-diff <- n_total - sum(n_by_grade)
-
-# --- Step 3: Systematic sampling within each grade ---
-sampled_data <- data.frame()
-
-for(g in names(n_by_grade)){
-  
-  cluster <- studentlist[studentlist$Grade == g, ]
-  N_h <- nrow(cluster)
-  n_h <- n_by_grade[g]
-  
-  if(n_h == 0) next
-  
-  k <- N_h / n_h  # sampling interval
-  
-  start <- runif(1, 1, k)
-  
-  indices <- floor(start + (0:(n_h - 1)) * k)
-  indices <- pmin(indices, N_h)  # avoid overflow
-  
-  sampled <- cluster[indices, ]
-  
-  sampled_data <- rbind(sampled_data, sampled)
-}
-
-# --- Final sample ---
-sampled_data
-```
-
-
-### RECYCLE BIN ###
-A. Overall sampling rate (Lec. 8 PPeS, p. 58)
-$$
-f = \frac{ma*}{\sum_{i\epsilon h}MOS_{hi}}; where\\ 
-m = \#\ of\ clusters\ and\\
-a* = targeted\ sub\ sample\ size
-$$
-B. Calculate overall sampling fraction
-```{r}
-#Calculate overall sampling rate
-f <- (m*a)/sum(regcounts$Count); f
-```
-C. Strata sampling rate (Lec. 8 PPeS, p. 58)
-$$
-f = \frac{m_hm_h*}{\sum_{i\epsilon h}MOS_{hi}}; where\\ 
-m = \#\ of\ clusters\ and\\
-a* = targeted\ sub\ sample\ size
-$$
-D. Calculate
-```{r}
-regcounts$f_h <- (regcounts$m_h * regcounts$m_h) / sum(regcounts$Count); regcounts
-```
-
-D. Sampling rate of clusters at the first stage in each stratum (n)
-$$
-n_h = \frac{nMOS_i}{\sum_{i}MOS_{i}}
-$$
-
-D. Sampling rate of clusters (schools) at the first stage in each stratum (m)
-$$
-m_h = \frac{mMOS_h}{\sum_{i\epsilon h}MOS_{h}}
-$$
-F. f_h
-$$
-f_h = \frac{n_hm_h^*}{\sum_{i\epsilon h}MOS_{hi}}
-$$
-
