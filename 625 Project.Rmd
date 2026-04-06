@@ -681,7 +681,7 @@ The sample is sorted by grade (7->8) then grouped by teacher (random)
 
 a. Proportion of students within each grade
 ```{r}
-table(studentlist$Grade)
+table(studentlist$Grade) 
 ```
 
 
