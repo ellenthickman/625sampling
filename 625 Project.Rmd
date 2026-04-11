@@ -429,7 +429,7 @@ regcounts[1:2]
 #Calculate stratum weight
 regcounts$w_h <- regcounts$Count/sum(regcounts$Count)
 ```
-C. Calculate total number of schools to sample at the first stage in each stratum (m)
+C. Calculate total number of schools to sample at the first stage in each stratum (a)
 ```{r}
 regcounts$a_h_raw <- regcounts$w_h * a
 regcounts$a_h_round <- round(regcounts$a_h_raw); sum(regcounts$a_h_round)
@@ -455,7 +455,7 @@ sum(regcounts$a_h_pair)
 regcounts
 ```
 
-D. Calculate total number of schools to sample at the first stage in each stratum (n) (EXTRA)
+D. Calculate total number of students to sample (n) (EXTRA)
 ```{r}
 #Calculate sample size within each stratum
 regcounts$n_raw <- (n*regcounts$w_h); regcounts
@@ -632,6 +632,10 @@ selected_schools <- selected_schools %>%
   mutate(
     overall_f = f1 * f2
   )
+
+regcounts <- selected_schools %>%
+  group_by(Region) %>%
+  summarise(f_ji = sum(f2))
 ```
 
 
@@ -660,7 +664,7 @@ x_i = f_{j|i} * M_h
 $$
 a. Input known values
 ```{r}
-mstar_7 = 12
+mstar_7 = 49 # b_h value for Region 7
 MOS_7 = 242
 
 M_7 = 219 #Actual size of school. To find x_7
@@ -681,17 +685,17 @@ $$
 $$
 
 ```{r}
-p <- 0.8595
+p <- 0.34298
 
-x_7_compare <- 11*(p)+10*(1-p)
+x_7_compare <- 45*(p)+44*(1-p)
 x_7; x_7_compare #Verify
 ```
 3. Report
 ```{r}
 1/fji_7; p; 1-p
 ```
-With a fractional interval 20.17, select a sample of 11 students with
-probability 0.86 or a sample of 10 students with probability 0.14. Selecting a proportionate sample with respect to grade.
+With a fractional interval 4.94, select a sample of 45 students with
+probability 0.34 or a sample of 44 students with probability 0.66. Selecting a proportionate sample with respect to grade.
 
 3. Select 
 The sample is sorted by grade (7->8) then grouped by teacher (random)
