@@ -709,7 +709,7 @@ set.seed(123)  # for reproducibility
 # --- Step 1: Decide sample size (10 or 11) ---
 u <- runif(1)
 
-n_total <- ifelse(u <= 0.86, 11, 10)
+n_total <- ifelse(u <= 0.34, 45, 44)
 
 # --- Step 2: Proportionate allocation by grade ---
 grade_counts <- table(studentlist$Grade)
