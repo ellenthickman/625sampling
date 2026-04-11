@@ -420,6 +420,9 @@ $$
 n_h = n * \frac{N_h}{N} = n * W_h
 $$
 B. Input known values
+
+m_opt represents the planned (expected) number of students to be sampled per selected school. However, in the second stage, students are selected using a sampling rate based on the design MOS, so the actual number of students sampled per school may differ from m_opt depending on the realized school size.
+
 ```{r}
 n <- 4224 # Total overall number of students sampled
 m <- 44 # No. of students within school (cluster size)
@@ -502,44 +505,152 @@ schoolframe_sorted <- schoolframe_sorted %>%
   mutate(zone_size = tot_all / a_h_pair)
 ```
 
-4. Select the allocated number of schools within each stratum using PPeS sampling using systematic selection based on the fractional intervals (Zone size) 
+
 ```{r}
-# Step 5: PPeS systematic selection within each stratum
-library(sampling)
-selected_schools <- schoolframe_sorted %>%
+
+min_size <- 44 # need 44 students to sample per school (comes from sampling design)
+
+schoolframe_linked <- schoolframe_sorted %>%
   group_by(Region) %>%
+  arrange(tot_all, .by_group = TRUE) %>%
   group_modify(~{
-    
-    data_h <- .x
-    
-    # total MOS in stratum
-    MOS_h <- sum(data_h$tot_all)
-    
-    # number of schools to select in this stratum
-    a_h_pair <- unique(data_h$a_h_pair)
-    
-    # inclusion probabilities
-    pik <- a_h_pair * data_h$tot_all / MOS_h
-    
-    # select sample using systematic PPS
-    s <- UPsystematic(pik)
-    
-    data_h$selected <- s
-    
-    data_h
+
+    df <- .x
+    n <- nrow(df)
+
+    df$link_id <- NA_integer_
+    current_link <- 1
+    i <- 1
+
+    while (i <= n) {
+
+      # -----------------------------
+      # CASE 1: both current & next are large → separate links
+      # -----------------------------
+      if (i < n &&
+          df$tot_all[i] >= min_size &&
+          df$tot_all[i + 1] >= min_size) {
+
+        df$link_id[i] <- current_link
+
+        # SAFETY: ensure assignment
+        if (is.na(df$link_id[i])) {
+          df$link_id[i] <- current_link
+        }
+
+        i <- i + 1
+        current_link <- current_link + 1
+        next
+      }
+
+      # -----------------------------
+      # CASE 2: find next sufficient unit
+      # -----------------------------
+      j <- i
+      while (j <= n && df$tot_all[j] < min_size) {
+        j <- j + 1
+      }
+
+      # If none found → assign ALL remaining safely
+      if (j > n) {
+        df$link_id[i:n] <- current_link
+
+        # SAFETY fill
+        df$link_id[i:n][is.na(df$link_id[i:n])] <- current_link
+
+        break
+      }
+
+      # -----------------------------
+      # CASE 3: backward accumulation
+      # -----------------------------
+      running_sum <- 0
+      k <- j
+
+      while (k >= i && running_sum < min_size) {
+        running_sum <- running_sum + df$tot_all[k]
+        df$link_id[k] <- current_link
+        k <- k - 1
+      }
+
+      # SAFETY: ensure all touched rows assigned
+      idx <- (k + 1):j
+      df$link_id[idx] <- current_link
+
+      # move forward
+      i <- j + 1
+      current_link <- current_link + 1
+    }
+
+    # FINAL SAFETY NET (guarantees no NA ever)
+    df$link_id[is.na(df$link_id)] <- current_link
+
+    df
   }) %>%
   ungroup()
 
+# =========================
+# STEP 2: LINK-LEVEL MOS
+# =========================
 
-selected_schools %<>%
+link_frame <- schoolframe_linked %>%
+  group_by(Region, link_id) %>%
+  summarise(
+    MOS_link = sum(tot_all),
+    a_h_pair = first(a_h_pair),
+    .groups = "drop"
+  )
+
+# =========================
+# STEP 3: LINK-LEVEL PPS PROBABILITY
+# =========================
+link_frame <- link_frame %>%
+  left_join(regcounts, by = c("Region", "a_h_pair")) %>%
+  mutate(
+    pi_link = (a_h_pair * MOS_link) / Count
+  )
+
+# =========================
+# STEP 4: DRAW SAMPLE OF LINKS
+# =========================
+link_frame <- link_frame %>%
+  group_by(Region) %>%
+  group_modify(~{
+
+    df <- .x
+
+    df$selected <- UPsystematic(pmin(df$pi_link, 1))
+
+    df
+  }) %>%
+  ungroup()
+
+link_frame %>%
+  group_by(Region) %>%
+  summarise(n_links = n())
+
+summary(link_frame$pi_link)
+
+# =========================
+# STEP 5: MERGE LINK SELECTION BACK TO SCHOOL LEVEL
+# =========================
+selected_schools <- schoolframe_linked %>%
+  left_join(
+    link_frame %>% select(Region, link_id, selected, MOS_link, Count, n_h, pi_link),
+    by = c("Region", "link_id")
+  )
+
+selected_schools <- selected_schools %>%
   filter(selected == 1)
 
 check_alloc <- selected_schools %>%
+  distinct(Region, link_id, selected, a_h_pair) %>%
   group_by(Region) %>%
   summarise(
-    planned = unique(a_h_pair),
     selected = sum(selected, na.rm = TRUE),
-    diff = selected - planned
+    planned = first(a_h_pair),
+    diff = selected - planned,
+    .groups = "drop"
   )
 
 check_alloc
@@ -565,19 +676,27 @@ first_stage_f
 
 6. Form pseudo-strata to meet paired selection model to estimate sampling variance
 ```{r}
-selected_schools <- selected_schools %>%
-  arrange(Region, tot_all) %>%   # keep the PPS-selected schools in sorted order within region
+link_frame <- link_frame %>%
+  filter(selected == 1)
+
+link_frame <- link_frame %>%
+  arrange(Region, MOS_link) %>%   # PPS order proxy
   group_by(Region) %>%
   mutate(
     order_in_region = row_number(),
-    pseudo_stratum_within_region = ceiling(order_in_region / 2) # create pseudo-strata of size 2 within each region for paired variance estimation
+    pseudo_stratum_within_region = ceiling(order_in_region / 2)
   ) %>%
   ungroup()
 
-# Unique pseudo-stratum ID across regions
-selected_schools <- selected_schools %>%
+link_frame <- link_frame %>%
   mutate(
     pseudo_stratum_id = paste0("R", Region, "_P", pseudo_stratum_within_region)
+  )
+
+selected_schools <- selected_schools %>%
+  left_join(
+    link_frame %>% select(Region, link_id, pseudo_stratum_id),
+    by = c("Region", "link_id")
   )
 ```
 
@@ -597,13 +716,12 @@ regcounts$b_h <- ceiling(regcounts$b_h_raw)
 ```{r}
 # Step 2: Check if sampled schools have sufficient size
 selected_schools <- selected_schools %>%
-  left_join(regcounts %>% select(Region, b_h), by = "Region") 
+  left_join(regcounts %>% select(Region, b_h, b_h_raw), by = "Region") 
 
 
 selected_schools %<>%
-  mutate(sufficient_size = (tot_all >= b_h))
+  mutate(sufficient_size = (MOS_link >= b_h))
     # check if the total number of students in the school meets the required number to sample
-
 
 
 # Identify schools that do not meet the sufficient size requirement
@@ -614,28 +732,14 @@ selected_schools %>%
 3. Begin to describe how you will physically select the subsample of students within a given sampled school (or set of linked schools). What will your second-stage sampling rate be for a given school within a given stratum? How will you acquire the updated rosters from each school? What technique will you use to select the sample at the specified second-stage Rate?
 ```{r}
 selected_schools <- selected_schools %>%
-  group_by(Region) %>%
   mutate(
-    MOS_h = sum(tot_all)   # total MOS in stratum
-  ) %>%
-  ungroup()
-
-selected_schools <- selected_schools %>%
-  mutate(
-    f1 = (a_h_pair * tot_all) / MOS_h
+    pi2 = b_h_raw / MOS_link
   )
 
 selected_schools <- selected_schools %>%
-  mutate(f2 = b_h / tot_all)
-
-selected_schools <- selected_schools %>%
   mutate(
-    overall_f = f1 * f2
+    overall_f = pi_link * pi2
   )
-
-regcounts <- selected_schools %>%
-  group_by(Region) %>%
-  summarise(f_ji = sum(f2))
 ```
 
 
