@@ -19,6 +19,8 @@ library(readxl)
 library(knitr)
 library(ggrepel)
 library(tidyverse)
+library(survey)
+library(sampling)
 options(scipen = 999)
 ```
 
@@ -701,14 +703,9 @@ selected_schools <- selected_schools %>%
   left_join(regcounts %>% select(Region, b_h, b_h_raw), by = "Region") 
 
 
-selected_schools %<>%
+selected_schools %>%
   mutate(sufficient_size = (MOS_link >= b_h))
     # check if the total number of students in the school meets the required number to sample
-
-
-# Identify schools that do not meet the sufficient size requirement
-selected_schools %>%
-  filter(!sufficient_size)
 ```
 
 3. Begin to describe how you will physically select the subsample of students within a given sampled school (or set of linked schools). What will your second-stage sampling rate be for a given school within a given stratum? How will you acquire the updated rosters from each school? What technique will you use to select the sample at the specified second-stage Rate?
@@ -837,6 +834,167 @@ for(g in names(n_by_grade)){
 sampled_data
 ```
 
+## Week 13 Variance Estimation Plan
+
+# Define the SECU inside each pseudo-stratum:
+- each selected linked set is one SECU
+- each pseudo-stratum must contain exactly 2 SECUs
+- BRR uses those paired SECUs to generate replicate estimates
+```{r}
+# Build the BRR sampling error calculation model
+# Use the selected linked units ,not school rows, as the PSU-like units for BRR
+secu_frame <- link_frame %>%
+  filter(selected == 1) %>%
+  arrange(Region, pseudo_stratum_within_region, link_id) %>%
+  group_by(Region, pseudo_stratum_id) %>%
+  mutate(
+    SECU = row_number()
+  ) %>%
+  ungroup() %>%
+  mutate(
+    BRR_STRATUM = pseudo_stratum_id,
+    PSU_ID = paste0("R", Region, "_L", link_id)
+  )
+
+secu_frame
+```
+
+```{r}
+# Number of original schools inside each selected linked set
+secu_school_count <- selected_schools %>%
+  distinct(Region, link_id, BCODE) %>%
+  count(Region, link_id, name = "n_schools_in_link")
+
+secu_frame <- secu_frame %>%
+  left_join(secu_school_count, by = c("Region", "link_id")) %>%
+  left_join(regcounts %>% select(Region, b_h_raw, b_h, a_h_pair, n_h), by = "Region")
+
+secu_frame
+```
+
+- SECUs distribution;
+- Numbers per stratum;
+- Expected sample sizes per SECU
+
+```{r}
+brr_overall <- secu_frame %>%
+  summarise(
+    total_pseudo_strata = n_distinct(BRR_STRATUM),
+    total_SECUs = n(),
+    expected_BRR_df = n_distinct(BRR_STRATUM)
+  )
+brr_overall
+
+```
+
+- Public analysis stratum code: Region
+- Variance stratum code for BRR: BRR_STRATUM
+- SECU: one selected linked school set
+- Number of SECUs per BRR pseudo-stratum: 2
+- Expected BRR degrees of freedom: number of pseudo-strata
+
+The paired allocation is:(2,2,2,2,4,6,20,20,38);
+the number of pseudo-strata by region is: (1,1,1,1,2,3,10,10,19),
+for a total of: 48 pseudo-strata.
+So the expected BRR degrees of freedom are df = 48.
+
+# Check for oversized linked PSUs before BRR construction
+
+ZZ: add a formula here for final report
+```{r}
+# Oversized linked units
+oversized_links <- secu_frame %>%
+  filter(pi_link >= 1) # any linked unit has first-stage inclusion probability greater or equal 1, it becomes a certainty/ oversized PSU
+
+oversized_links
+```
+
+- No oversized PSU from the output
+
+```{r}
+## Week 13
+## 1. Ideal epsem selection rate
+
+epsem_target <- n / sum(regcounts$Count)
+epsem_target
+
+## 2. Region-level comparison: ideal epsem vs actual design rate
+
+epsem_compare_region <- regcounts %>%
+  mutate(
+    ideal_epsem = epsem_target,
+    
+    # exact planned student-level rate before rounding b_h
+    actual_rate_exact = n_h / Count,
+    
+    # implemented student-level rate after using rounded b_h
+    actual_rate_impl = (a_h_pair * b_h) / Count,
+    
+    rel_diff_exact = (actual_rate_exact - ideal_epsem) / ideal_epsem,
+    rel_diff_impl  = (actual_rate_impl  - ideal_epsem) / ideal_epsem
+  ) %>%
+  select(
+    Region, Count, n_h, a_h_pair, b_h_raw, b_h,
+    ideal_epsem, actual_rate_exact, actual_rate_impl,
+    rel_diff_exact, rel_diff_impl
+  )
+
+epsem_compare_region
+```
+- Acceptable from the output, need to specify how in pre
+
+Sample BRR Implementation:
+```{r}
+library(survey)
+
+# Replace student_analysis with the final student-level file contain:
+#   BRR_STRATUM, PSU_ID, final_wt, and outcome variables such as ever_cig
+
+# d_base <- svydesign(
+#   id = ~PSU_ID,
+#   strata = ~BRR_STRATUM,
+#   weights = ~final_wt,
+#   data = student_analysis,
+#   nest = TRUE
+# )
+
+# Convert to BRR replicate design
+# d_brr <- as.svrepdesign(d_base, type = "BRR")
+
+# Example: weighted proportion ever smoked one cigarette
+# cig_est <- svymean(~ever_cig, d_brr)
+# cig_est
+# confint(cig_est, df = 48)
+```
+
+
+# Check 20% Subclass estimation
+
+```{r}
+# Expected subclass support
+expected_subclass_n <- 0.20 * sum(regcounts$n_h)
+expected_subclass_per_pseudo <- expected_subclass_n / n_distinct(secu_frame$BRR_STRATUM)
+expected_subclass_per_SECU <- expected_subclass_n / nrow(secu_frame)
+
+c(
+  expected_subclass_n = expected_subclass_n,
+  expected_subclass_per_pseudo = expected_subclass_per_pseudo,
+  expected_subclass_per_SECU = expected_subclass_per_SECU
+)
+```
+
+The overall student sample size is now n = 4224. A 20% subclass would have expected size: $0.20 \times 4224 = 844.8 \approx 845$. With 48 pseudo-strata and 96 SECUs:
+
+$$\text{expected subclass students per pseudo-stratum}
+= \frac{845}{48} = 17.6$$
+
+$$\text{expected subclass students per SECU}
+= \frac{845}{96} = 8.8$$
+
+Thus overall, the SECUs appear large enough to support subclass estimation, although some pseudo-strata may still be sparse if the subclass is unevenly distributed.
+
+# Summary
+For variance estimation, we will release Region as the public stratum code and a BRR-specific pseudo-stratum identifier constructed by pairing selected linked school sets within each region. Each pseudo-stratum contains exactly two sampling error computation units (SECUs), where each SECU is one selected linked school set. Under the final paired allocation, this produces 48 pseudo-strata and therefore 48 BRR degrees of freedom. Point estimates for means and proportions will be formed using final analysis weights. Although the design is approximately epsem by construction, we can still retain final weights to account for linking (to be discussed), differences between frame MOS and actual roster sizes, and any later nonresponse adjustments. Variance estimation and confidence intervals will be based on BRR replicate weights. The same BRR design will be competent for the client’s requested 20% subclass estimates, treating the subclass as a survey domain rather than as a separate design.
 
 ### RECYCLE BIN ###
 A. Overall sampling rate (Lec. 8 PPeS, p. 58)
