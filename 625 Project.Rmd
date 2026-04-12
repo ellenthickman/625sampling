@@ -510,80 +510,62 @@ schoolframe_sorted <- schoolframe_sorted %>%
 
 min_size <- 44 # need 44 students to sample per school (comes from sampling design)
 
+set.seed(1234)
+
 schoolframe_linked <- schoolframe_sorted %>%
   group_by(Region) %>%
   arrange(tot_all, .by_group = TRUE) %>%
   group_modify(~{
-
     df <- .x
-    n <- nrow(df)
+    n  <- nrow(df)
 
     df$link_id <- NA_integer_
-    current_link <- 1
-    i <- 1
+    current_link <- 1L
+    i <- 1L
 
     while (i <= n) {
 
-      # -----------------------------
-      # CASE 1: both current & next are large → separate links
-      # -----------------------------
-      if (i < n &&
-          df$tot_all[i] >= min_size &&
-          df$tot_all[i + 1] >= min_size) {
+      # Large school stands alone only if the next school is also >= min_size (or it's last)
+      next_is_large <- (i == n) || (df$tot_all[i + 1L] >= min_size)
 
+      if (df$tot_all[i] >= min_size && next_is_large) {
         df$link_id[i] <- current_link
-
-        # SAFETY: ensure assignment
-        if (is.na(df$link_id[i])) {
-          df$link_id[i] <- current_link
-        }
-
-        i <- i + 1
-        current_link <- current_link + 1
+        current_link <- current_link + 1L
+        i <- i + 1L
         next
       }
 
-      # -----------------------------
-      # CASE 2: find next sufficient unit
-      # -----------------------------
+      # Otherwise, build the smallest forward block [i:j] with sum >= min_size
+      running_sum <- 0
       j <- i
-      while (j <= n && df$tot_all[j] < min_size) {
-        j <- j + 1
+      while (j <= n && running_sum < min_size) {
+        running_sum <- running_sum + df$tot_all[j]
+        j <- j + 1L
       }
+      j <- j - 1L
 
-      # If none found → assign ALL remaining safely
-      if (j > n) {
-        df$link_id[i:n] <- current_link
-
-        # SAFETY fill
-        df$link_id[i:n][is.na(df$link_id[i:n])] <- current_link
-
+      # If you can't reach min_size with remaining rows, merge remainder into previous group
+      if (running_sum < min_size) {
+        if (current_link == 1L) {
+          stop("Impossible: Region total < min_size, so no grouping can satisfy the threshold.")
+        }
+        df$link_id[i:n] <- current_link - 1L
         break
       }
 
-      # -----------------------------
-      # CASE 3: backward accumulation
-      # -----------------------------
-      running_sum <- 0
-      k <- j
-
-      while (k >= i && running_sum < min_size) {
-        running_sum <- running_sum + df$tot_all[k]
-        df$link_id[k] <- current_link
-        k <- k - 1
-      }
-
-      # SAFETY: ensure all touched rows assigned
-      idx <- (k + 1):j
-      df$link_id[idx] <- current_link
-
-      # move forward
-      i <- j + 1
-      current_link <- current_link + 1
+      df$link_id[i:j] <- current_link
+      current_link <- current_link + 1L
+      i <- j + 1L
     }
 
-    # FINAL SAFETY NET (guarantees no NA ever)
-    df$link_id[is.na(df$link_id)] <- current_link
+    # Validate: every group meets threshold
+    check <- df %>%
+      group_by(link_id) %>%
+      summarise(group_sum = sum(tot_all), .groups = "drop")
+
+    if (any(check$group_sum < min_size)) {
+      stop("At least one link group is below min_size; check inputs/logic.")
+    }
 
     df
   }) %>%
