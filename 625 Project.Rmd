@@ -474,6 +474,37 @@ regcounts <- regcounts %>%
 
 sum(regcounts$n_h); regcounts
 ```
+# Charts
+```{r}
+library(ggrepel)
+regcounts$w_h_percent <- round(regcounts$w_h*100, digits = 2)
+regcounts$w_h_percent <- factor(
+  paste0(regcounts$w_h_percent, "%"),
+  levels = paste0(regcounts$w_h_percent, "%"))
+
+regcounts <- regcounts %>%
+  arrange(desc(w_h_percent)) %>%
+  mutate(
+    fraction = w_h / sum(w_h),
+    ymax = cumsum(fraction),
+    ymin = lag(ymax, default = 0),
+    label_pos = (ymax + ymin) / 2
+  )
+
+ggplot(regcounts, aes(x=1, y=w_h, fill=w_h_percent)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  theme_void()+
+  scale_fill_manual(values = c(
+    "#1b9e77", "#d95f02", "#7570b3",
+    "#e7298a", "#66a61e", "#e6ab02",
+    "#FFCB05", "#a96900", "#1f78b4"
+  ), name="Weights in %") +
+  labs(fill = "Weights in %")
+ggsave("myggplot.png", width = 8, height = 5, units = "in")
+
+
+```
 
 2. Sort the list to achieve implicit stratification within the regions, using tot_all from previous year as MOS
 A. Sort the list
