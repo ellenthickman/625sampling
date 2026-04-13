@@ -1,7 +1,7 @@
 ---
-title: "625 Sampling Project"
-author: "Ellen Hickman, Mi Huynh, Maze Nead & Zupeng Zeng"
-date: "2026-01-21"
+title: '625 Sampling Project'
+author: 'Ellen Hickman, Mi Huynh, Maze Nead & Zupeng Zeng'
+date: '2026-01-21'
 output:
   pdf_document: default
   word_document: default
@@ -26,7 +26,7 @@ options(scipen = 999)
 
 ## Download data
 ```{r}
-schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv")
+schoolframe <- read.csv('https://raw.githubusercontent.com/ellenthickman/625sampling/refs/heads/main/MI_school_frame_head_counts.csv')
 ```
 
 ## Week 3: Sampling Frame Analysis
@@ -38,22 +38,22 @@ schoolframe <- read.csv("https://raw.githubusercontent.com/ellenthickman/625samp
 ## 2. Blanks: Ellen.
 ### Examine by: Missingness check. 
 ``` {r}
-# a. Check missingness across variables as blank ""
-sapply(schoolframe, function(x) sum(x == "", na.rm = TRUE))
+# a. Check missingness across variables as blank ''
+sapply(schoolframe, function(x) sum(x == '', na.rm = TRUE))
 ```
 Out of 2,443 schools in Michigan, 559 do not have listed District Names. Let's examine this prevalence by Non-Public/Public schools and by Region.
 
 ### Prevalence: (eg. Frequency tables)
 ```{r}
 # b. Since missing district name might vary by public/private school status, let's check:
-tab1 <- table(schoolframe$District_Name == "", schoolframe$Public.nonpublic); kable(tab1)
+tab1 <- table(schoolframe$District_Name == '', schoolframe$Public.nonpublic); kable(tab1)
 # c. By region, let's check:
-tab2 <- table(schoolframe$District_Name == "", schoolframe$Region); kable(tab2)
-tab3 <- table(factor(schoolframe$District_Name == "", levels = c(TRUE, FALSE)),
+tab2 <- table(schoolframe$District_Name == '', schoolframe$Region); kable(tab2)
+tab3 <- table(factor(schoolframe$District_Name == '', levels = c(TRUE, FALSE)),
              factor(schoolframe$Region))
 kable(prop.table(tab3, margin = 2))
 # c. By district code, let's check:
-tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == "")
+tab4 <- table(schoolframe$DCODE, schoolframe$District_Name == '')
 ```
 From Tables 1-3, we see that the majority of missing district name cases (547/559, 98%) belong to non-public (ie. private) schools, whereas only a handful of public schools are missing district names (12/1884, ~0.0%). It also looks like even though the private schools are missing District Names, they do belong to a District Code that other, public schools are also a part of. 
 
@@ -71,11 +71,11 @@ So, the solution to the problem is to 1) ignore District Names as a cluster vari
 ### Solution:
 ```{r}
 # Basic cleaning: ensure head-count columns are numeric (handles commas if present)
-count_vars <- c("g7_totl","g8_totl","g9_totl","g10_totl","g11_totl","g12_totl","tot_all")
+count_vars <- c('g7_totl','g8_totl','g9_totl','g10_totl','g11_totl','g12_totl','tot_all')
 
 schoolframe <- schoolframe %>%
   mutate(across(all_of(count_vars),
-                ~ as.numeric(gsub(",", "", as.character(.x)))))
+                ~ as.numeric(gsub(',', '', as.character(.x)))))
 
 # Sanity checks
 N_rows     <- nrow(schoolframe)
@@ -99,7 +99,7 @@ district_summary <- schoolframe %>%
     n_schools = n(),
     district_name_count = n_distinct(na.omit(District_Name)),
     total_enroll = sum(tot_all, na.rm = TRUE),
-    .groups = "drop"
+    .groups = 'drop'
   )
 
 # Distribution of schools per district
@@ -118,7 +118,7 @@ q_df <- tibble(
   value = as.numeric(qs)
 )
 
-ggplot(district_summary, aes(x = "", y = n_schools)) +
+ggplot(district_summary, aes(x = '', y = n_schools)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.18, outlier.shape = NA) +
   geom_segment(
@@ -129,20 +129,20 @@ ggplot(district_summary, aes(x = "", y = n_schools)) +
   ) +
   geom_text_repel(
     data = q_df,
-    aes(x = 1.22, y = value, label = paste0(prob, ": ", round(value, 2))),
+    aes(x = 1.22, y = value, label = paste0(prob, ': ', round(value, 2))),
     inherit.aes = FALSE,
-    direction = "y",
+    direction = 'y',
     nudge_x = 0.08,
     hjust = 0,
     size = 3,
     min.segment.length = 0
   ) +
   labs(
-    title = "Distribution of Number of Schools by District",
+    title = 'Distribution of Number of Schools by District',
     x = NULL,
-    y = "Schools per district"
+    y = 'Schools per district'
   ) +
-  coord_cartesian(clip = "off") +
+  coord_cartesian(clip = 'off') +
   theme_minimal() +
   theme(
     plot.margin = margin(5.5, 90, 5.5, 5.5),
@@ -164,7 +164,7 @@ district_summary %>%
 name_dupes_within_district <- schoolframe %>%
   filter(!is.na(District_Name), !is.na(BNAME)) %>%
   group_by(DCODE, District_Name, BNAME) %>%
-  summarise(n_records = n(), .groups = "drop") %>%
+  summarise(n_records = n(), .groups = 'drop') %>%
   filter(n_records > 1) %>%
   arrange(desc(n_records))
 
@@ -211,7 +211,7 @@ n_req <- c(
 
 # Summary
 out <- data.frame(
-  variable = c("Ever smoked one cigarette (p)", "Ever smoked marijuana (p)", "Age first approached (mean)"),
+  variable = c('Ever smoked one cigarette (p)', 'Ever smoked marijuana (p)', 'Age first approached (mean)'),
   expected_estimate = c(p_cig, p_mj, mu_age),
   element_variance_S2 = c(S2_cig, S2_mj, S2_age),
   target_CV = cv_target,
@@ -305,16 +305,16 @@ var_clust_new <- deff_new * var_srs_new
 
 # CVs under new design, standard deviation/mean, expected mean values from week4 input
 cv_new <- c(
-  cig = sqrt(var_clust_new["cig"]) / p_cig,
-  mj  = sqrt(var_clust_new["mj"])  / p_mj,
-  age = sqrt(var_clust_new["age"]) / mu_age
+  cig = sqrt(var_clust_new['cig']) / p_cig,
+  mj  = sqrt(var_clust_new['mj'])  / p_mj,
+  age = sqrt(var_clust_new['age']) / mu_age
 )
 
 # Compare to precision targets
 varstar <- c(cig = varstar_cig, mj = varstar_mj, age = varstar_age)
 
 precision_check <- data.frame(
-  variable = c("cig","mj","age"),
+  variable = c('cig','mj','age'),
   roh = as.numeric(roh),
   m_used = m_overall,
   a_used = a_overall,
@@ -367,9 +367,9 @@ for(i in 1:nrow(opt_plan)) {
   
   # CVs under new design
   cv_new <- c(
-    cig = sqrt(var_clust_new["cig"]) / p_cig,
-    mj  = sqrt(var_clust_new["mj"])  / p_mj,
-    age = sqrt(var_clust_new["age"]) / mu_age
+    cig = sqrt(var_clust_new['cig']) / p_cig,
+    mj  = sqrt(var_clust_new['mj'])  / p_mj,
+    age = sqrt(var_clust_new['age']) / mu_age
   )
   
   # Targets
@@ -377,7 +377,7 @@ for(i in 1:nrow(opt_plan)) {
   
   # Precision check table
   precision_tables[[ opt_plan$variable[i] ]] <- data.frame(
-    variable = c("cig","mj","age"),
+    variable = c('cig','mj','age'),
     roh = as.numeric(roh),
     m_used = m_overall,
     a_used = a_overall,
@@ -478,7 +478,7 @@ sum(regcounts$n_h); regcounts
 2. Sort the list to achieve implicit stratification within the regions, using tot_all from previous year as MOS
 A. Sort the list
 ```{r}
-schoolframe$tot_all <- as.numeric(gsub(",", "", as.character(schoolframe$tot_all)))
+schoolframe$tot_all <- as.numeric(gsub(',', '', as.character(schoolframe$tot_all)))
 
 schoolframe_sorted <- schoolframe %>%
   arrange(Region, tot_all)
@@ -501,7 +501,7 @@ reg_totals <- schoolframe_sorted %>%
   summarise(MOS_h = sum(tot_all))
 
 schoolframe_sorted <- schoolframe_sorted %>%
-  left_join(regcounts %>% select(Region, a_h_pair), by = "Region")
+  left_join(regcounts %>% select(Region, a_h_pair), by = 'Region')
 
 schoolframe_sorted <- schoolframe_sorted %>%
   mutate(zone_size = tot_all / a_h_pair)
@@ -549,7 +549,7 @@ schoolframe_linked <- schoolframe_sorted %>%
       # If you can't reach min_size with remaining rows, merge remainder into previous group
       if (running_sum < min_size) {
         if (current_link == 1L) {
-          stop("Impossible: Region total < min_size, so no grouping can satisfy the threshold.")
+          stop('Impossible: Region total < min_size, so no grouping can satisfy the threshold.')
         }
         df$link_id[i:n] <- current_link - 1L
         break
@@ -563,10 +563,10 @@ schoolframe_linked <- schoolframe_sorted %>%
     # Validate: every group meets threshold
     check <- df %>%
       group_by(link_id) %>%
-      summarise(group_sum = sum(tot_all), .groups = "drop")
+      summarise(group_sum = sum(tot_all), .groups = 'drop')
 
     if (any(check$group_sum < min_size)) {
-      stop("At least one link group is below min_size; check inputs/logic.")
+      stop('At least one link group is below min_size; check inputs/logic.')
     }
 
     df
@@ -582,14 +582,14 @@ link_frame <- schoolframe_linked %>%
   summarise(
     MOS_link = sum(tot_all),
     a_h_pair = first(a_h_pair),
-    .groups = "drop"
+    .groups = 'drop'
   )
 
 # =========================
 # STEP 3: LINK-LEVEL PPS PROBABILITY
 # =========================
 link_frame <- link_frame %>%
-  left_join(regcounts, by = c("Region", "a_h_pair")) %>%
+  left_join(regcounts, by = c('Region', 'a_h_pair')) %>%
   mutate(
     pi_link = (a_h_pair * MOS_link) / Count
   )
@@ -621,7 +621,7 @@ summary(link_frame$pi_link)
 selected_schools <- schoolframe_linked %>%
   left_join(
     link_frame %>% select(Region, link_id, selected, MOS_link, Count, n_h, pi_link),
-    by = c("Region", "link_id")
+    by = c('Region', 'link_id')
   )
 
 selected_schools <- selected_schools %>%
@@ -634,7 +634,7 @@ check_alloc <- selected_schools %>%
     selected = sum(selected, na.rm = TRUE),
     planned = first(a_h_pair),
     diff = selected - planned,
-    .groups = "drop"
+    .groups = 'drop'
   )
 
 check_alloc
@@ -674,13 +674,13 @@ link_frame <- link_frame %>%
 
 link_frame <- link_frame %>%
   mutate(
-    pseudo_stratum_id = paste0("R", Region, "_P", pseudo_stratum_within_region)
+    pseudo_stratum_id = paste0('R', Region, '_P', pseudo_stratum_within_region)
   )
 
 selected_schools <- selected_schools %>%
   left_join(
     link_frame %>% select(Region, link_id, pseudo_stratum_id),
-    by = c("Region", "link_id")
+    by = c('Region', 'link_id')
   )
 ```
 
@@ -700,7 +700,7 @@ regcounts$b_h <- ceiling(regcounts$b_h_raw)
 ```{r}
 # Step 2: Check if sampled schools have sufficient size
 selected_schools <- selected_schools %>%
-  left_join(regcounts %>% select(Region, b_h, b_h_raw), by = "Region") 
+  left_join(regcounts %>% select(Region, b_h, b_h_raw), by = 'Region') 
 
 
 selected_schools %>%
@@ -734,7 +734,7 @@ selected_schools <- selected_schools %>%
 ## Week 11
 ### Download data
 ```{r}
-studentlist <- read.csv("https://raw.githubusercontent.com/ellenthickman/625sampling/main/sample_school_student_list.csv")
+studentlist <- read.csv('https://raw.githubusercontent.com/ellenthickman/625sampling/main/sample_school_student_list.csv')
 head(studentlist)
 ```
 
@@ -853,7 +853,7 @@ secu_frame <- link_frame %>%
   ungroup() %>%
   mutate(
     BRR_STRATUM = pseudo_stratum_id,
-    PSU_ID = paste0("R", Region, "_L", link_id)
+    PSU_ID = paste0('R', Region, '_L', link_id)
   )
 
 secu_frame
@@ -863,11 +863,11 @@ secu_frame
 # Number of original schools inside each selected linked set
 secu_school_count <- selected_schools %>%
   distinct(Region, link_id, BCODE) %>%
-  count(Region, link_id, name = "n_schools_in_link")
+  count(Region, link_id, name = 'n_schools_in_link')
 
 secu_frame <- secu_frame %>%
-  left_join(secu_school_count, by = c("Region", "link_id")) %>%
-  left_join(regcounts %>% select(Region, b_h_raw, b_h, a_h_pair, n_h), by = "Region")
+  left_join(secu_school_count, by = c('Region', 'link_id')) %>%
+  left_join(regcounts %>% select(Region, b_h_raw, b_h, a_h_pair, n_h), by = 'Region')
 
 secu_frame
 ```
@@ -959,7 +959,7 @@ library(survey)
 # )
 
 # Convert to BRR replicate design
-# d_brr <- as.svrepdesign(d_base, type = "BRR")
+# d_brr <- as.svrepdesign(d_base, type = 'BRR')
 
 # Example: weighted proportion ever smoked one cigarette
 # cig_est <- svymean(~ever_cig, d_brr)
