@@ -476,20 +476,11 @@ sum(regcounts$n_h); regcounts
 ```
 # Charts
 ```{r}
-library(ggrepel)
-regcounts$w_h_percent <- round(regcounts$w_h*100, digits = 2)
-regcounts$w_h_percent <- factor(
-  paste0(regcounts$w_h_percent, "%"),
-  levels = paste0(regcounts$w_h_percent, "%"))
-
-regcounts <- regcounts %>%
-  arrange(desc(w_h_percent)) %>%
-  mutate(
-    fraction = w_h / sum(w_h),
-    ymax = cumsum(fraction),
-    ymin = lag(ymax, default = 0),
-    label_pos = (ymax + ymin) / 2
-  )
+# library(ggrepel)
+# regcounts$w_h_percent <- round(regcounts$w_h*100, digits = 2)
+# regcounts$w_h_percent <- factor(
+#   paste0(regcounts$w_h_percent, "%"),
+#   levels = paste0(regcounts$w_h_percent, "%"))
 
 ggplot(regcounts, aes(x=1, y=w_h, fill=w_h_percent)) +
   geom_bar(stat="identity", width=1) +
