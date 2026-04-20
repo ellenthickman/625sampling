@@ -482,17 +482,17 @@ sum(regcounts$n_h); regcounts
 #   paste0(regcounts$w_h_percent, "%"),
 #   levels = paste0(regcounts$w_h_percent, "%"))
 
-ggplot(regcounts, aes(x=1, y=w_h, fill=w_h_percent)) +
-  geom_bar(stat="identity", width=1) +
-  coord_polar("y", start=0) +
-  theme_void()+
-  scale_fill_manual(values = c(
-    "#1b9e77", "#d95f02", "#7570b3",
-    "#e7298a", "#66a61e", "#e6ab02",
-    "#FFCB05", "#a96900", "#1f78b4"
-  ), name="Weights in %") +
-  labs(fill = "Weights in %")
-ggsave("myggplot.png", width = 8, height = 5, units = "in")
+# ggplot(regcounts, aes(x=1, y=w_h, fill=w_h_percent)) +
+#   geom_bar(stat="identity", width=1) +
+#   coord_polar("y", start=0) +
+#   theme_void()+
+#   scale_fill_manual(values = c(
+#     "#1b9e77", "#d95f02", "#7570b3",
+#     "#e7298a", "#66a61e", "#e6ab02",
+#     "#FFCB05", "#a96900", "#1f78b4"
+#   ), name="Weights in %") +
+#   labs(fill = "Weights in %")
+# ggsave("myggplot.png", width = 8, height = 5, units = "in")
 
 
 ```
@@ -629,7 +629,7 @@ schoolframe_linked <- link_frame %>%
 # =========================
 # STEP 4: DRAW SAMPLE OF LINKS
 # =========================
-schoolframe_linked <- schoolframe_linked %>%
+link_frame <- link_frame %>%
   group_by(Region) %>%
   group_modify(~{
 
@@ -641,17 +641,24 @@ schoolframe_linked <- schoolframe_linked %>%
   }) %>%
   ungroup()
 
-summary(schoolframe_linked$pi_link)
-
 selected_schools <- schoolframe_linked %>%
-  filter(selected == 1)
+  left_join(link_frame %>% select(Region, link_id, selected, pi_link, MOS_link),
+            by = c("Region","link_id", "MOS_link", "pi_link")) %>%
+  filter(selected == 1) %>%
+  group_by(Region, link_id) %>%
+  slice_sample(n = 1, weight_by = tot_all) %>%   # PPS: Pr(school|link) = tot_all/MOS_link
+  ungroup() %>%
+  mutate(
+    pi_school = pi_link * (tot_all / MOS_link)    # overall inclusion prob under this 2-stage design
+  )
 
 
 # 4) Check you still have the planned number of first-stage selections
-check_alloc_one <- selected_schools %>%
-  count(Region, name = "selected_schools") %>%
+check_alloc <- link_frame %>%
+  filter(selected == 1) %>%
+  count(Region, name = "selected_links") %>%
   left_join(regcounts %>% select(Region, planned = a_h_pair), by = "Region") %>%
-  mutate(diff = selected_schools - planned)
+  mutate(diff = selected_links - planned)
 
 ```
 5. Report first-stage sampling fraction (f) within each of the nine strata under PPes
@@ -759,7 +766,7 @@ x_i = f_{j|i} * M_h
 $$
 a. Input known values
 ```{r}
-mstar_7 = 49 # b_h value for Region 7
+mstar_7 = 48.845747 # b_h value for Region 7
 MOS_7 = 242
 
 M_7 = 219 #Actual size of school. To find x_7
@@ -780,7 +787,7 @@ $$
 $$
 
 ```{r}
-p <- 0.34298
+p <- 0.20338
 
 x_7_compare <- 45*(p)+44*(1-p)
 x_7; x_7_compare #Verify
@@ -804,7 +811,7 @@ set.seed(123)  # for reproducibility
 # --- Step 1: Decide sample size (10 or 11) ---
 u <- runif(1)
 
-n_total <- ifelse(u <= 0.34, 45, 44)
+n_total <- ifelse(u <= 0.20, 45, 44)
 
 # --- Step 2: Proportionate allocation by grade ---
 grade_counts <- table(studentlist$Grade)
