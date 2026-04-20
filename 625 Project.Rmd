@@ -571,7 +571,7 @@ schoolframe_linked <- schoolframe_sorted %>%
       # If you can't reach min_size with remaining rows, merge remainder into previous group
       if (running_sum < min_size) {
         if (current_link == 1L) {
-          stop('Impossible: Region total < min_size, so no grouping can satisfy the threshold.')
+          stop("Impossible: Region total < min_size, so no grouping can satisfy the threshold.")
         }
         df$link_id[i:n] <- current_link - 1L
         break
@@ -585,10 +585,10 @@ schoolframe_linked <- schoolframe_sorted %>%
     # Validate: every group meets threshold
     check <- df %>%
       group_by(link_id) %>%
-      summarise(group_sum = sum(tot_all), .groups = 'drop')
+      summarise(group_sum = sum(tot_all), .groups = "drop")
 
     if (any(check$group_sum < min_size)) {
-      stop('At least one link group is below min_size; check inputs/logic.')
+      stop("At least one link group is below min_size; check inputs/logic.")
     }
 
     df
@@ -604,22 +604,32 @@ link_frame <- schoolframe_linked %>%
   summarise(
     MOS_link = sum(tot_all),
     a_h_pair = first(a_h_pair),
-    .groups = 'drop'
+    .groups = "drop"
   )
 
 # =========================
 # STEP 3: LINK-LEVEL PPS PROBABILITY
 # =========================
 link_frame <- link_frame %>%
-  left_join(regcounts, by = c('Region', 'a_h_pair')) %>%
+  left_join(regcounts, by = c("Region", "a_h_pair")) %>%
   mutate(
     pi_link = (a_h_pair * MOS_link) / Count
+  )
+
+
+link_frame <- link_frame %>%
+  select(Region, link_id, MOS_link, a_h_pair, Count, pi_link)
+
+schoolframe_linked <- link_frame %>%
+  left_join(schoolframe_linked, by = c("Region", "link_id", "a_h_pair")) %>%
+  mutate(
+    MOS_school = tot_all,
   )
 
 # =========================
 # STEP 4: DRAW SAMPLE OF LINKS
 # =========================
-link_frame <- link_frame %>%
+schoolframe_linked <- schoolframe_linked %>%
   group_by(Region) %>%
   group_modify(~{
 
@@ -631,35 +641,18 @@ link_frame <- link_frame %>%
   }) %>%
   ungroup()
 
-link_frame %>%
-  group_by(Region) %>%
-  summarise(n_links = n())
+summary(schoolframe_linked$pi_link)
 
-summary(link_frame$pi_link)
-
-# =========================
-# STEP 5: MERGE LINK SELECTION BACK TO SCHOOL LEVEL
-# =========================
 selected_schools <- schoolframe_linked %>%
-  left_join(
-    link_frame %>% select(Region, link_id, selected, MOS_link, Count, n_h, pi_link),
-    by = c('Region', 'link_id')
-  )
-
-selected_schools <- selected_schools %>%
   filter(selected == 1)
 
-check_alloc <- selected_schools %>%
-  distinct(Region, link_id, selected, a_h_pair) %>%
-  group_by(Region) %>%
-  summarise(
-    selected = sum(selected, na.rm = TRUE),
-    planned = first(a_h_pair),
-    diff = selected - planned,
-    .groups = 'drop'
-  )
 
-check_alloc
+# 4) Check you still have the planned number of first-stage selections
+check_alloc_one <- selected_schools %>%
+  count(Region, name = "selected_schools") %>%
+  left_join(regcounts %>% select(Region, planned = a_h_pair), by = "Region") %>%
+  mutate(diff = selected_schools - planned)
+
 ```
 5. Report first-stage sampling fraction (f) within each of the nine strata under PPes
 A. First stage sampling fraction
@@ -712,21 +705,18 @@ selected_schools <- selected_schools %>%
 # Step 1: Required number of students per sampled school to maintain epsem
 
 # number of students to sample per school in each stratum to maintain epsem
-regcounts$b_h_raw <- regcounts$n_h / regcounts$a_h_pair
-# Round up to ensure we meet the required number of students per stratum
-regcounts$b_h <- ceiling(regcounts$b_h_raw)
-
+regcounts$b_h_star <- regcounts$n_raw / regcounts$a_h_pair
 ```
 
 2. Do each of the schools that you sampled in a given region have the minimum sufficient size, given the stratum-specific subsample sizes computed in Task #1 (Week 10)? Do subsequent schools on the list have the minimum sufficient size? If not, what will you do?
 ```{r}
 # Step 2: Check if sampled schools have sufficient size
 selected_schools <- selected_schools %>%
-  left_join(regcounts %>% select(Region, b_h, b_h_raw), by = 'Region') 
+  left_join(regcounts %>% select(Region, b_h_star), by = 'Region') 
 
 
 selected_schools %>%
-  mutate(sufficient_size = (MOS_link >= b_h))
+  mutate(sufficient_size = (MOS_link >= b_h_star))
     # check if the total number of students in the school meets the required number to sample
 ```
 
@@ -734,7 +724,7 @@ selected_schools %>%
 ```{r}
 selected_schools <- selected_schools %>%
   mutate(
-    pi2 = b_h_raw / MOS_link
+    pi2 = b_h_star / MOS_link
   )
 
 selected_schools <- selected_schools %>%
@@ -889,7 +879,7 @@ secu_school_count <- selected_schools %>%
 
 secu_frame <- secu_frame %>%
   left_join(secu_school_count, by = c('Region', 'link_id')) %>%
-  left_join(regcounts %>% select(Region, b_h_raw, b_h, a_h_pair, n_h), by = 'Region')
+  left_join(regcounts %>% select(Region, b_h_star, a_h_pair, n_h), by = 'Region')
 
 secu_frame
 ```
@@ -950,13 +940,13 @@ epsem_compare_region <- regcounts %>%
     actual_rate_exact = n_h / Count,
     
     # implemented student-level rate after using rounded b_h
-    actual_rate_impl = (a_h_pair * b_h) / Count,
+    actual_rate_impl = (a_h_pair * b_h_star) / Count,
     
     rel_diff_exact = (actual_rate_exact - ideal_epsem) / ideal_epsem,
     rel_diff_impl  = (actual_rate_impl  - ideal_epsem) / ideal_epsem
   ) %>%
   select(
-    Region, Count, n_h, a_h_pair, b_h_raw, b_h,
+    Region, Count, n_h, a_h_pair, b_h_star,
     ideal_epsem, actual_rate_exact, actual_rate_impl,
     rel_diff_exact, rel_diff_impl
   )
