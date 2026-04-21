@@ -468,8 +468,9 @@ regcounts$n_raw <- (n*regcounts$w_h); regcounts
 #Round down strata #6 since f_i is closest to .50 threshold & Round to nearest integer for all else
 regcounts <- regcounts %>%
   mutate(
-    n_raw = (n * Count) / sum(Count),
-    n_h = ifelse(Region == 6, floor(n_raw), round(n_raw))
+    n_raw = ((n * Count) / sum(Count))/0.3,
+    n_h = ifelse(Region == 6, floor(n_raw), round(n_raw)),
+    a_h_pair = a_h_pair / 0.5
   )
 
 sum(regcounts$n_h); regcounts
@@ -502,8 +503,15 @@ A. Sort the list
 ```{r}
 schoolframe$tot_all <- as.numeric(gsub(',', '', as.character(schoolframe$tot_all)))
 
+schoolframe <- schoolframe %>%
+  mutate(
+    sch_lvl = ifelse((g7_totl>0 | g8_totl>0) & (g9_totl==0 & g10_totl ==0 & g11_totl ==0 & g12_totl == 0), "middle school", NA),
+    sch_lvl = ifelse((g7_totl==0 & g8_totl==0) & (g9_totl>0 | g10_totl >0 | g11_totl >0 | g12_totl > 0), "high school", sch_lvl),
+    sch_lvl = ifelse((g7_totl>0 | g8_totl>0)& (g9_totl>0 | g10_totl >0 | g11_totl >0 | g12_totl > 0), "7-12", sch_lvl)
+  )
+
 schoolframe_sorted <- schoolframe %>%
-  arrange(Region, tot_all)
+  arrange(Region, Public.nonpublic, sch_lvl)
 ```
 
 3. Compute your zone size (Fractional intervals) for systematic PPeS sampling within each of the 9 strata
@@ -518,9 +526,9 @@ schoolframe_sorted <- schoolframe_sorted %>%
   mutate(cum_MOS = cumsum(tot_all)) %>%
   ungroup()
 
-reg_totals <- schoolframe_sorted %>%
-  group_by(Region) %>%
-  summarise(MOS_h = sum(tot_all))
+# reg_totals <- schoolframe_sorted %>%
+#   group_by(Region) %>%
+#   summarise(MOS_h = sum(tot_all))
 
 schoolframe_sorted <- schoolframe_sorted %>%
   left_join(regcounts %>% select(Region, a_h_pair), by = 'Region')
@@ -532,7 +540,7 @@ schoolframe_sorted <- schoolframe_sorted %>%
 
 ```{r}
 
-min_size <- 51 # need 51 students to sample per school (comes from sampling design)
+min_size <- 170 # need 51 students to sample per school (comes from sampling design)
 
 set.seed(1234)
 
@@ -766,7 +774,7 @@ x_i = f_{j|i} * M_h
 $$
 a. Input known values
 ```{r}
-mstar_7 = 48.845747 # b_h value for Region 7
+mstar_7 = 81.40958 # b_h value for Region 7
 MOS_7 = 242
 
 M_7 = 219 #Actual size of school. To find x_7
@@ -787,14 +795,14 @@ $$
 $$
 
 ```{r}
-p <- 0.20338
+p <- 0.67231
 
-x_7_compare <- 45*(p)+44*(1-p)
+x_7_compare <- 74*(p)+73*(1-p)
 x_7; x_7_compare #Verify
 ```
 3. Report
 ```{r}
-1/fji_7; p; 1-p
+k<-1/fji_7; k; p; 1-p
 ```
 With a fractional interval 4.94, select a sample of 45 students with
 probability 0.34 or a sample of 44 students with probability 0.66. Selecting a proportionate sample with respect to grade.
@@ -811,7 +819,7 @@ set.seed(123)  # for reproducibility
 # --- Step 1: Decide sample size (10 or 11) ---
 u <- runif(1)
 
-n_total <- ifelse(u <= 0.20, 45, 44)
+n_total <- ifelse(u <= 0.33, 74, 73)
 
 # --- Step 2: Proportionate allocation by grade ---
 grade_counts <- table(studentlist$Grade)
@@ -837,7 +845,7 @@ for(g in names(n_by_grade)){
   
   if(n_h == 0) next
   
-  k <- N_h / n_h  # sampling interval
+  #k <- N_h / n_h  # sampling interval
   
   start <- runif(1, 1, k)
   
