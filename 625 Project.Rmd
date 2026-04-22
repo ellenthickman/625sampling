@@ -540,7 +540,7 @@ schoolframe_sorted <- schoolframe_sorted %>%
 
 ```{r}
 
-min_size <- 170 # need 51 students to sample per school (comes from sampling design)
+min_size <- 84 # need 51 students to sample per school (comes from sampling design)
 
 set.seed(1234)
 
